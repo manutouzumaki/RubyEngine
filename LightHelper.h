@@ -70,4 +70,36 @@ namespace Ruby {
         XMFLOAT4 Reflect;
     };
 
+    namespace Pbr {
+
+        struct DirectionalLight
+        {
+            DirectionalLight() { ZeroMemory(this, sizeof(this)); }
+            XMFLOAT4 Color;
+            XMFLOAT3 Direction;
+            float Pad; // Pad the last float so we can set an array of lights if we wanted.
+        };
+
+        struct PointLight
+        {
+            PointLight() { ZeroMemory(this, sizeof(this)); }
+            XMFLOAT4 Color;
+            XMFLOAT3 Position;
+            float Pad; // Pad the last float so we can set an array of lights if we wanted.
+
+
+        };
+
+        struct Material
+        {
+            Material() { ZeroMemory(this, sizeof(this)); }
+            XMFLOAT4 Albedo;
+            float Metallic;
+            float Roughness;
+            float Ao;
+            float Pad;
+        };
+    
+    }
+
 }

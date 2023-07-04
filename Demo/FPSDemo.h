@@ -76,7 +76,7 @@ private:
     Ruby::FrameBuffer* mFrameBuffers[2];
     Ruby::FrameBuffer* mPinPongFrameBuffers[2];
 
-    Ruby::DirectionalLight mDirLight;
-    Ruby::PointLight mPointLight;
+    Ruby::Pbr::DirectionalLight mDirLight;
+    Ruby::Pbr::PointLight mPointLight;
 
 };

@@ -253,7 +253,7 @@ namespace Ruby
                 JsonObject* metallicFactor = pbrMetallicRoughness->GetChildByName("metallicFactor");
                 JsonObject* roughnessFactor = pbrMetallicRoughness->GetChildByName("roughnessFactor");
 
-                Material material = Material();
+                Pbr::Material material = Pbr::Material();
 
                 float baseColorR = baseColorFactor->firstValue->valueFloat;
                 float baseColorG = baseColorFactor->firstValue->next->valueFloat;
@@ -261,24 +261,25 @@ namespace Ruby
                 float baseColorA = baseColorFactor->firstValue->next->next->next->valueFloat;
 
                 float metallicFactorFloat = metallicFactor->firstValue->valueFloat;
+                float roughnessFactorFloat = roughnessFactor->firstValue->valueFloat;
 
-
-                material.Ambient = { baseColorR, baseColorG, baseColorB, baseColorA };
-                material.Diffuse = { baseColorR, baseColorG, baseColorB, baseColorA };
-                material.Specular = XMFLOAT4(0.8f, 0.8f, 0.8f, 32.0f);
-
+                material.Albedo = { baseColorR, baseColorG, baseColorB, baseColorA };
+                material.Metallic = metallicFactorFloat;
+                material.Roughness = roughnessFactorFloat;
+                material.Ao = 1.0f;
 
                 Mat.push_back(material);
-
 
                 value = value->next;
             }
         }
         else {
-            Material material = Material();
-            material.Ambient = { 0.2f, 0.0f, 0.2f, 1.0f };
-            material.Diffuse = { 1.0f, 0.0f, 1.0f, 1.0f };
-            material.Specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 16.0f);
+            Pbr::Material material = Pbr::Material();
+
+            material.Albedo = { 0.2f, 0.0f, 0.2f, 1.0f };
+            material.Metallic = 0.0f;
+            material.Roughness = 0.5f;
+            material.Ao = 1.0f;
 
             Mat.push_back(material);
         }

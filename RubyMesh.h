@@ -54,6 +54,7 @@ namespace Ruby
     class Mesh
     {
     public:
+        Mesh() {};
         Mesh(ID3D11Device* device,
             const std::string modelFilename,
             const std::string modelBinFilename,
@@ -61,7 +62,8 @@ namespace Ruby
         ~Mesh();
 
         UINT SubsetCount;
-        std::vector<Material> Mat;
+        //std::vector<Material> Mat;
+        std::vector<Pbr::Material> Mat;
         std::vector<ID3D11ShaderResourceView*> DiffuseMapSRV;
         std::vector<ID3D11ShaderResourceView*> NormalMapSRV;
 

@@ -44,7 +44,7 @@ namespace Ruby {
     struct MeshData
     {
         std::vector<Vertex> Vertices;
-        std::vector<UINT> Indices;
+        std::vector<USHORT> Indices;
     };
 
     class GeometryGenerator

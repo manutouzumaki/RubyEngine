@@ -80,7 +80,7 @@ FPSDemo::~FPSDemo()
 
 static float angle = 0.0f;
 static XMVECTOR lightPos;
-static float lightDist = 5.0f;
+static float lightDist = 8.0f;
 static float lightHeight = 4.0f;
 
 
@@ -95,14 +95,8 @@ bool FPSDemo::Init()
     mMesh[3] = new Ruby::Mesh(mDevice, "./assets/level.gltf",  "./assets/level.bin", "./");
     mMesh[4] = new Ruby::Mesh(mDevice, "./assets/cube.gltf", "./assets/cube.bin", "./");
     mMesh[5] = new Ruby::Mesh(mDevice, "./assets/castel.gltf", "./assets/castel.bin", "./");
-
-    mMesh[4]->Mat[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-    mMesh[4]->Mat[0].Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-    mMesh[4]->Mat[0].Specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
-
-    mMesh[1]->Mat[0].Ambient = XMFLOAT4(100.0f, 5.0f, 0.0f, 1.0f);
-    mMesh[1]->Mat[0].Diffuse = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
-    mMesh[1]->Mat[0].Specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+    
+    mMesh[1]->Mat[0].Albedo = XMFLOAT4(100, 10, 0, 0);
 
     mShadowMap = new ShadowMap(mDevice, 1024, 1024);
 
@@ -127,7 +121,7 @@ bool FPSDemo::Init()
     {
         ID3D10Blob* compiledShader = 0;
         ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/color.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
+        HRESULT result = D3DX11CompileFromFile("./FX/pbrColor.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
 
         if (compilationMsgs != 0)
         {
@@ -290,22 +284,17 @@ bool FPSDemo::Init()
 
 
     lightPos = XMVectorSet(0.0f, lightHeight, lightDist, 1.0f);
-    mDirLight.Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-    mDirLight.Diffuse = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-    mDirLight.Specular = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
-    XMVECTOR lightDir = XMVector3Normalize(target - lightPos);
+
+    mDirLight.Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    XMVECTOR lightDir = XMVector3Normalize(lightPos);
     XMStoreFloat3(&mDirLight.Direction, lightDir);
-    mFxDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::DirectionalLight));
+    mFxDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
 
     // Point light--position is changed every frame to animate in UpdateScene function.
     
-    mPointLight.Ambient = XMFLOAT4(0.2f, 0.01f, 0.0f, 1.0f);
-    mPointLight.Diffuse = XMFLOAT4(30.0f, 10.0f, 10.0f, 1.0f);
-    mPointLight.Specular = XMFLOAT4(0.1f, 0.1f, 0.1f, 64.0f);
-    mPointLight.Att = XMFLOAT3(10.0f, 10.0f, 10.0f);
-    mPointLight.Range = 300.0f;
-    mPointLight.Position = XMFLOAT3(0.0f, lightHeight, lightDist);
-    mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::PointLight));
+    mPointLight.Color = XMFLOAT4(300.0f, 300.0f, 300.0f, 1.0f);
+    mPointLight.Position = XMFLOAT3(5.0f, 1.0f, -10.0f);
+    mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
     return true;
 }
@@ -348,8 +337,8 @@ void FPSDemo::UpdateScene(float dt)
     XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
     XMStoreFloat4x4(&mView, V);
 
-    mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, lightHeight, cosf(angle) * 5.0f);
-    mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::PointLight));
+    //mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, 6, cosf(angle) * 5.0f);
+    //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
 }
 
@@ -370,7 +359,7 @@ void FPSDemo::DrawScene()
 
         XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
 
-        XMMATRIX P = XMMatrixOrthographicOffCenterLH(-20, 20, -20, 20, 0.0001f, 30.0f);
+        XMMATRIX P = XMMatrixOrthographicOffCenterLH(-20, 20, -20, 20, 0.0001f, 45.0f);
 
         XMMATRIX lightSpaceMatrix = V * P;
         mDepthFxLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
@@ -391,6 +380,19 @@ void FPSDemo::DrawScene()
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
+
+            // draw mesh 1
+            {
+                XMMATRIX world = XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-10.0f, 8.0f, -10.0f);
+                mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                Ruby::Mesh* mesh = mMesh[1];
+                for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                {
+                    mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mesh->ModelMesh.Draw(mImmediateContext, i);
+                }
+            }
+
             // draw mesh 2
             {
                 XMMATRIX world = XMMatrixTranslation(-1, 7, -2);
@@ -475,7 +477,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[3];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -491,7 +493,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[0];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -499,7 +501,7 @@ void FPSDemo::DrawScene()
             // draw mesh 1
             {
                 
-                XMMATRIX world = XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(mPointLight.Position.x, mPointLight.Position.y, mPointLight.Position.z);
+                XMMATRIX world = XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-10.0f, 8.0f, -10.0f);
                 XMMATRIX worldInvTranspose = InverseTranspose(world);
                 XMMATRIX worldViewProj = world * viewProj;
                 mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
@@ -508,7 +510,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[1];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -525,7 +527,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[2];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -543,7 +545,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[4];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -559,7 +561,7 @@ void FPSDemo::DrawScene()
                 Ruby::Mesh* mesh = mMesh[5];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Material));
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
@@ -609,7 +611,7 @@ void FPSDemo::DrawScene()
 
     mHdrBackBuffer->SetResource(mFrameBuffers[0]->GetShaderResourceView());
     mBloomBuffer->SetResource(mPinPongFrameBuffers[1]->GetShaderResourceView());
-
+    // Final render to quad2d
     {
         ID3D11RenderTargetView* renderTarget[1] = { mRenderTargetView };
         mImmediateContext->OMSetRenderTargets(1, renderTarget, 0);

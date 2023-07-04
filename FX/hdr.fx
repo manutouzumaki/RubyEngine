@@ -86,16 +86,14 @@ float4 PS(VertexOut pin) : SV_Target
     //float3 mapped = hdrColor / (hdrColor + float3(1.0f, 1.0f, 1.0f));
 
     // exposure tone mapping
-    float exposure = 0.5f;
+    float exposure = 1.0f;
     float3 mapped = float3(1.0f, 1.0f, 1.0f) - exp(-hdrColor * exposure);
-
-
 
     // gama correction
     float invgamma = 1.0f / 2.2;
     mapped = pow(abs(mapped), invgamma.xxx);
 
-
+    //return color;
     return float4(mapped, 1.0f);
 }
 
