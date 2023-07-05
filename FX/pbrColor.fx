@@ -38,6 +38,7 @@ cbuffer cbPerObject
 };
 
 Texture2D gShadowMap;
+TextureCube gCubeMap;
 
 SamplerState samLinear
 {
@@ -93,7 +94,7 @@ float ShadowCalculation(float4 fragPosLightSpace)
     float currentDepth = projCoords.z;
     // check whether current frag pos is in shadow
    
-    float bias = 0.01f;
+    float bias = 0.005f;
     float shadow = 0.0f;
     if ((currentDepth - bias) > closestDepth)
     {
@@ -179,7 +180,7 @@ PixelOut PS(VertexOut pin)
         float3 H = normalize(V + L);
         float distance = length(LightsDir[i]);
         float attenuation = 1.0f / (distance * distance);
-        float3 radiance = LightsColor[i] * attenuation;
+        float3 radiance = (LightsColor[i] * attenuation);
         if (i == 0)
         {
             radiance = LightsColor[i];
@@ -211,7 +212,6 @@ PixelOut PS(VertexOut pin)
         Lo += (kD * Albedo / PI + specular) * radiance * NdotL; // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
         
     }
-    
     // ambient lighting (note that the next IBL tutorial will replace 
     // this ambient lighting with environment lighting).
     float3 ambient = float3(0.03f, 0.03f, 0.03f) * Albedo * Ao;
@@ -234,7 +234,7 @@ PixelOut PS(VertexOut pin)
     output.Color = float4(color, 1.0f);
     
     float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
-    if (brightness > 1.0)
+    if (brightness > 1.0 && gMaterial.Albedo.w == 0.0f)
         output.Bright = float4(color, 1.0f);
     else
         output.Bright = float4(0.0, 0.0, 0.0, 1.0);

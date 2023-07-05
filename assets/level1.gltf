@@ -70,7 +70,7 @@
                     "ior" : 1.4500000476837158
                 }
             },
-            "name" : "Material",
+            "name" : "Material.001",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
                     0.07219056785106659,
@@ -84,7 +84,7 @@
         },
         {
             "doubleSided" : true,
-            "name" : "Material.001",
+            "name" : "Material.004",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
                     0.12833334505558014,

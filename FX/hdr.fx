@@ -93,7 +93,6 @@ float4 PS(VertexOut pin) : SV_Target
     float invgamma = 1.0f / 2.2;
     mapped = pow(abs(mapped), invgamma.xxx);
 
-    //return color;
     return float4(mapped, 1.0f);
 }
 

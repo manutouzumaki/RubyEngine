@@ -33,8 +33,8 @@ public:
 private:
     
 
-    ID3D11Buffer* mVertexBuffer;
-    ID3D11Buffer* mIndexBuffer;
+    //ID3D11Buffer* mVertexBuffer;
+    //ID3D11Buffer* mIndexBuffer;
 
     ID3DX11Effect* mEffect;
     ID3DX11EffectTechnique* mTechnique;
@@ -47,7 +47,12 @@ private:
     ID3DX11EffectVectorVariable* mFxEyePosW;
     ID3DX11EffectMatrixVariable* mFxLightSpaceMatrix;
     ID3DX11EffectShaderResourceVariable* mFxShadowMap;
+    ID3DX11EffectShaderResourceVariable* mFxCubeMap;
 
+    ID3DX11Effect* mCubemapEffect;
+    ID3DX11EffectTechnique* mCubemapTechnique;
+    ID3DX11EffectMatrixVariable* mCubemapWorldViewProj;
+    ID3DX11EffectShaderResourceVariable* mCubeMap;
 
     ID3DX11Effect* mDepthEffect;
     ID3DX11EffectTechnique* mDepthTechnique;
@@ -70,6 +75,11 @@ private:
     XMFLOAT4X4 mView;
     XMFLOAT4X4 mProj;
 
+
+    Ruby::Pbr::Material mMaterials[49];
+
+    Ruby::MeshGeometry mSky;
+
     Ruby::Mesh* mMesh[6];
 
     ShadowMap* mShadowMap;
@@ -78,5 +88,7 @@ private:
 
     Ruby::Pbr::DirectionalLight mDirLight;
     Ruby::Pbr::PointLight mPointLight;
+
+    ID3D11ShaderResourceView* mCubeMapSRV;
 
 };
