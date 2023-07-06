@@ -1,5 +1,8 @@
 #include "FPSDemo.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 static XMMATRIX InverseTranspose(CXMMATRIX M)
 {
     // Inverse-transpose is just applied to normals.  So zero out 
@@ -54,11 +57,15 @@ FPSDemo::FPSDemo(HINSTANCE instance,
 
 FPSDemo::~FPSDemo()
 {
+    SAFE_DELETE(mEnviromentMap);
+    SAFE_DELETE(mIrradianceMap);
+
     SAFE_DELETE(mPinPongFrameBuffers[1]);
     SAFE_DELETE(mPinPongFrameBuffers[0]);
     SAFE_DELETE(mFrameBuffers[1]);
     SAFE_DELETE(mFrameBuffers[0]);
     SAFE_DELETE(mShadowMap);
+    SAFE_DELETE(mBrdfMap);
 
     SAFE_DELETE(mMesh[0]);
     SAFE_DELETE(mMesh[1]);
@@ -67,13 +74,23 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mMesh[4]);
     SAFE_DELETE(mMesh[5]);
 
+    SAFE_RELEASE(mHdrSkyTexture2D);
+    SAFE_RELEASE(mHdrSkySRV);
+
     SAFE_RELEASE(mCubeMapSRV);
+    SAFE_RELEASE(mBrdfEffect);
+    SAFE_RELEASE(mSkyEffect);
+    SAFE_RELEASE(mConvoluteEffect);
     SAFE_RELEASE(mCubemapEffect);
     SAFE_RELEASE(mEffect);
     SAFE_RELEASE(mDepthEffect);
     SAFE_RELEASE(mHdrEffect);
     SAFE_RELEASE(mBlurEffect);
     SAFE_RELEASE(mInputLayout);
+
+    SAFE_RELEASE(mRasterizerStateBackCull);
+    SAFE_RELEASE(mRasterizerStateFrontCull);
+
 }
 
 static float angle = 0.0f;
@@ -92,6 +109,18 @@ bool FPSDemo::Init()
 {
     if (!Ruby::App::Init())
         return false;
+
+
+    D3D11_RASTERIZER_DESC fillRasterizerNoneDesc = {};
+    fillRasterizerNoneDesc.FillMode = D3D11_FILL_SOLID;
+    fillRasterizerNoneDesc.CullMode = D3D11_CULL_BACK;
+    fillRasterizerNoneDesc.DepthClipEnable = true;
+    mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateBackCull);
+
+    fillRasterizerNoneDesc.FillMode = D3D11_FILL_SOLID;
+    fillRasterizerNoneDesc.CullMode = D3D11_CULL_FRONT;
+    fillRasterizerNoneDesc.DepthClipEnable = true;
+    mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
     mMesh[0] = new Ruby::Mesh(mDevice, "./assets/level1.gltf", "./assets/level1.bin", "./");
     mMesh[1] = new Ruby::Mesh(mDevice, "./assets/sphere.gltf",   "./assets/sphere.bin",  "./");
@@ -115,6 +144,60 @@ bool FPSDemo::Init()
         }
     }
 
+    // Load HDR Texture
+    {
+        stbi_set_flip_vertically_on_load(true);
+        int width, height, nrComponents;
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        if (data)
+        {
+            // Create HDR Texture2D
+            D3D11_TEXTURE2D_DESC texDesc;
+            texDesc.Width = width;
+            texDesc.Height = height;
+            texDesc.MipLevels = 1;
+            texDesc.ArraySize = 1;
+            texDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            texDesc.SampleDesc.Count = 1;
+            texDesc.SampleDesc.Quality = 0;
+            texDesc.Usage = D3D11_USAGE_DEFAULT;
+            texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            texDesc.CPUAccessFlags = 0;
+            texDesc.MiscFlags = 0;
+
+            std::vector<XMFLOAT4> colors;
+            for (int i = 0; i < width * height * 3; i += 3)
+            {
+                XMFLOAT4 color{ data[i + 0], data[i + 1], data[i + 2], 1.0f };
+                colors.push_back(color);
+            }
+
+            D3D11_SUBRESOURCE_DATA initData{};
+            initData.pSysMem = colors.data();
+            initData.SysMemPitch = width * (sizeof(float) * 4);
+            if (FAILED(mDevice->CreateTexture2D(&texDesc, &initData, &mHdrSkyTexture2D)))
+            {
+                OutputDebugString("Error Creating HDR Texture2D\n");
+            }
+
+            // Create Shader Resource View For HDR Texture
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
+            srvDesc.Texture2D.MostDetailedMip = 0;
+            if (FAILED(mDevice->CreateShaderResourceView(mHdrSkyTexture2D, &srvDesc, &mHdrSkySRV)))
+            {
+                OutputDebugString("Error Creating HDR Shader Resource View\n");
+            }
+
+            OutputDebugStringA("HDR Texture Loaded\n");
+
+            stbi_image_free(data);
+        }
+    }
+
     // Load Cube map
     {
         HRESULT result = D3DX11CreateShaderResourceViewFromFileA(mDevice, "./assets/cubemap.dds", 0, 0, &mCubeMapSRV, 0);
@@ -126,20 +209,20 @@ bool FPSDemo::Init()
 
     // Load the geometry for the sky (cubemap)
     {
-        Ruby::MeshData sphere;
+        Ruby::MeshData box;
         Ruby::GeometryGenerator geoGen;
-        geoGen.CreateSphere(1.0f, 30, 30, sphere);
+        geoGen.CreateBox(1.0f, 1.0f, 1.0f, box);
 
         std::vector<Ruby::MeshGeometry::Subset> subsetTable;
         Ruby::MeshGeometry::Subset subset{};
         subset.VertexStart = 0;
-        subset.VertexCount = sphere.Vertices.size();
+        subset.VertexCount = box.Vertices.size();
         subset.IndexStart = 0;
-        subset.IndexCount = sphere.Indices.size();
+        subset.IndexCount = box.Indices.size();
         subsetTable.push_back(subset);
 
-        mSky.SetVertices(mDevice, sphere.Vertices.data(), sphere.Vertices.size());
-        mSky.SetIndices(mDevice, sphere.Indices.data(), sphere.Indices.size());
+        mSky.SetVertices(mDevice, box.Vertices.data(), box.Vertices.size());
+        mSky.SetIndices(mDevice, box.Indices.data(), box.Indices.size());
         mSky.SetSubsetTable(subsetTable);
     }
     
@@ -152,6 +235,13 @@ bool FPSDemo::Init()
     mPinPongFrameBuffers[0] = new Ruby::FrameBuffer(mDevice, mClientWidth, mClientHeight, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     mPinPongFrameBuffers[1] = new Ruby::FrameBuffer(mDevice, mClientWidth, mClientHeight, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    
+    mBrdfMap = new Ruby::FrameBuffer(mDevice, 512, 512, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    mEnviromentMap = new Ruby::CubeFrameBuffer(mDevice, 512, 512, DXGI_FORMAT_R32G32B32A32_FLOAT, 5);
+    mIrradianceMap = new Ruby::CubeFrameBuffer(mDevice, 512, 512, DXGI_FORMAT_R32G32B32A32_FLOAT, 1);
+    
 
 
 
@@ -198,7 +288,9 @@ bool FPSDemo::Init()
         mFxEyePosW = mEffect->GetVariableByName("gEyePosW")->AsVector();
         mFxLightSpaceMatrix = mEffect->GetVariableByName("gLightSpaceMatrix")->AsMatrix();
         mFxShadowMap = mEffect->GetVariableByName("gShadowMap")->AsShaderResource();
-        mFxCubeMap = mEffect->GetVariableByName("gCubeMap")->AsShaderResource();
+        mFxIrradianceMap = mEffect->GetVariableByName("gIrradianceMap")->AsShaderResource();
+        mFxPrefilteredColor = mEffect->GetVariableByName("gPrefilteredColor")->AsShaderResource();
+        mFxBrdfLUT = mEffect->GetVariableByName("gBrdfLUT")->AsShaderResource();
     }
     // Create Depth Effect
     {
@@ -291,7 +383,6 @@ bool FPSDemo::Init()
         mBlurFxHorizontal = mBlurEffect->GetVariableByName("horizontal");
         mBlurFxImage = mBlurEffect->GetVariableByName("gImage")->AsShaderResource();
     }
-
     // Create Cubemap Effect
     {
         ID3D10Blob* compiledShader = 0;
@@ -320,9 +411,99 @@ bool FPSDemo::Init()
 
         mCubemapTechnique = mCubemapEffect->GetTechniqueByName("CubeMapTech");
         mCubemapWorldViewProj = mCubemapEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
+        mCubemapRoughness = mCubemapEffect->GetVariableByName("gRoughness");
         mCubeMap = mCubemapEffect->GetVariableByName("gCubeMap")->AsShaderResource();
     }
+    // Create Convolute Effect
+    {
+        ID3D10Blob* compiledShader = 0;
+        ID3D10Blob* compilationMsgs = 0;
+        HRESULT result = D3DX11CompileFromFile("./FX/convolute.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
 
+        if (compilationMsgs != 0)
+        {
+            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
+            SAFE_RELEASE(compilationMsgs);
+        }
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: compiling fx ...", 0, 0);
+        }
+
+        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mConvoluteEffect);
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: creating fx ...", 0, 0);
+        }
+
+        SAFE_RELEASE(compiledShader);
+
+        mConvoluteTechnique = mConvoluteEffect->GetTechniqueByName("ConvoluteTech");
+        mConvoluteWorldViewProj = mConvoluteEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
+        mConvoluteCubeMap = mConvoluteEffect->GetVariableByName("gCubeMap")->AsShaderResource();
+    }
+    // Create Sky Effect
+    {
+        ID3D10Blob* compiledShader = 0;
+        ID3D10Blob* compilationMsgs = 0;
+        HRESULT result = D3DX11CompileFromFile("./FX/sky.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
+
+        if (compilationMsgs != 0)
+        {
+            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
+            SAFE_RELEASE(compilationMsgs);
+        }
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: compiling fx ...", 0, 0);
+        }
+
+        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mSkyEffect);
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: creating fx ...", 0, 0);
+        }
+
+        SAFE_RELEASE(compiledShader);
+
+        mSkyTechnique = mSkyEffect->GetTechniqueByName("SkyTech");
+        mSkyWorldViewProj = mSkyEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
+        mSkyCubeMap = mSkyEffect->GetVariableByName("gCubeMap")->AsShaderResource();
+        mSkyTimer = mSkyEffect->GetVariableByName("gTimer");
+    }
+    // Create HDR Effect
+    {
+        ID3D10Blob* compiledShader = 0;
+        ID3D10Blob* compilationMsgs = 0;
+        HRESULT result = D3DX11CompileFromFile("./FX/brdf.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
+
+        if (compilationMsgs != 0)
+        {
+            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
+            SAFE_RELEASE(compilationMsgs);
+        }
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: compiling fx ...", 0, 0);
+        }
+
+        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mBrdfEffect);
+
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: creating fx ...", 0, 0);
+        }
+
+        SAFE_RELEASE(compiledShader);
+
+        mBrdfTechnique = mBrdfEffect->GetTechniqueByName("BrdfTech");
+
+    }
 
     // set the vertex Layout
     D3D11_INPUT_ELEMENT_DESC vertexDesc[] =
@@ -355,7 +536,7 @@ bool FPSDemo::Init()
 
     lightPos = XMVectorSet(0.0f, lightHeight, lightDist, 1.0f);
 
-    mDirLight.Color = XMFLOAT4(5.0f, 2.5f, 0.5f, 1.0f);
+    mDirLight.Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     XMVECTOR lightDir = XMVector3Normalize(lightPos);
     XMStoreFloat3(&mDirLight.Direction, lightDir);
     mFxDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
@@ -365,9 +546,155 @@ bool FPSDemo::Init()
     mPointLight.Position = XMFLOAT3(4.0f, 6.0f, -10.0f);
     mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
+    // Render CubeMap to Frame Buffer, we to this just one time at startup
+    {
+        XMMATRIX captureProj = XMMatrixPerspectiveFovLH((90.0f/180.0f) * XM_PI, 1.0f, 0.1f, 10.0f);
+        XMMATRIX captureViews[] = { 
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet( 1.0f,  0.0f,  0.0f, 0.0f), XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f)),
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet(-1.0f,  0.0f,  0.0f, 0.0f), XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f)),
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet( 0.0f,  1.0f,  0.0f, 0.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f)),
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet( 0.0f, -1.0f,  0.0f, 0.0f), XMVectorSet(0.0f, 0.0f,  1.0f, 0.0f)),
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet( 0.0f,  0.0f,  1.0f, 0.0f), XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f)),
+            XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet( 0.0f,  0.0f, -1.0f, 0.0f), XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f))
+        };
+
+        mCubeMap->SetResource(mHdrSkySRV);
+        mConvoluteCubeMap->SetResource(mHdrSkySRV);
+
+        mImmediateContext->IASetInputLayout(mInputLayout);
+        mImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        mImmediateContext->RSSetViewports(1, &mViewport);
+        mImmediateContext->RSSetState(mRasterizerStateFrontCull);
+
+        // create enviroment map
+        {
+            // Set the viewport transform.
+            float CurrentWidht = 512.0f;
+            float CurrentHeight = 512.0f;
+
+            for (int mipIndex = 0; mipIndex < mEnviromentMap->GetMipCount(); ++mipIndex)
+            {
+                mViewport.TopLeftX = 0;
+                mViewport.TopLeftY = 0;
+                mViewport.Width = CurrentWidht;
+                mViewport.Height = CurrentHeight;
+                mViewport.MinDepth = 0.0f;
+                mViewport.MaxDepth = 1.0f;
+                mImmediateContext->RSSetViewports(1, &mViewport);
+
+
+                float roughness = (float)mipIndex / (float)(mEnviromentMap->GetMipCount() - 1);
+                mCubemapRoughness->SetRawValue(&roughness, 0, sizeof(float));
+
+                CurrentWidht *= 0.5f;
+                CurrentHeight *= 0.5f;
+
+                for (int i = 0; i < 6; ++i)
+                {
+                    ID3D11RenderTargetView* renderTarget[1] = { mEnviromentMap->GetRenderTargetView(i, mipIndex) };
+                    mImmediateContext->OMSetRenderTargets(1, renderTarget, mEnviromentMap->GetDepthStencilView(mipIndex));
+
+                    XMVECTORF32 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+                    mImmediateContext->ClearRenderTargetView(mEnviromentMap->GetRenderTargetView(i, mipIndex), (float*)&clearColor);
+                    mImmediateContext->ClearDepthStencilView(mEnviromentMap->GetDepthStencilView(mipIndex), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+                    XMMATRIX viewProj = captureViews[i] * captureProj;
+
+                    D3DX11_TECHNIQUE_DESC techDesc;
+                    mCubemapTechnique->GetDesc(&techDesc);
+                    for (UINT p = 0; p < techDesc.Passes; ++p)
+                    {
+                        mCubemapWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
+                        mCubemapTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                        mSky.Draw(mImmediateContext, 0);
+                    }
+                }
+            }
+        }
+
+
+        // create irradiance map
+        {
+            mViewport.TopLeftX = 0;
+            mViewport.TopLeftY = 0;
+            mViewport.Width = 512.0f;
+            mViewport.Height = 512.0f;
+            mViewport.MinDepth = 0.0f;
+            mViewport.MaxDepth = 1.0f;
+            mImmediateContext->RSSetViewports(1, &mViewport);
+
+            for (int i = 0; i < 6; ++i)
+            {
+                ID3D11RenderTargetView* renderTarget[1] = { mIrradianceMap->GetRenderTargetView(i, 0) };
+                mImmediateContext->OMSetRenderTargets(1, renderTarget, mIrradianceMap->GetDepthStencilView(0));
+
+                XMVECTORF32 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+                mImmediateContext->ClearRenderTargetView(mIrradianceMap->GetRenderTargetView(i, 0), (float*)&clearColor);
+                mImmediateContext->ClearDepthStencilView(mIrradianceMap->GetDepthStencilView(0), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+                XMMATRIX viewProj = captureViews[i] * captureProj;
+
+                D3DX11_TECHNIQUE_DESC techDesc;
+                mConvoluteTechnique->GetDesc(&techDesc);
+                for (UINT p = 0; p < techDesc.Passes; ++p)
+                {
+                    mConvoluteWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
+                    mConvoluteTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mSky.Draw(mImmediateContext, 0);
+                }
+            }
+        }
+
+        mImmediateContext->RSSetState(mRasterizerStateBackCull);
+
+        mViewport.TopLeftX = 0;
+        mViewport.TopLeftY = 0;
+        mViewport.Width = mClientWidth;
+        mViewport.Height = mClientHeight;
+        mViewport.MinDepth = 0.0f;
+        mViewport.MaxDepth = 1.0f;
+        mImmediateContext->RSSetViewports(1, &mViewport);
+    }
+
+    // Brdf Texture Generation
+    {
+        mViewport.TopLeftX = 0;
+        mViewport.TopLeftY = 0;
+        mViewport.Width = 512.0f;
+        mViewport.Height = 512.0f;
+        mViewport.MinDepth = 0.0f;
+        mViewport.MaxDepth = 1.0f;
+        mImmediateContext->RSSetViewports(1, &mViewport);
+        ID3D11RenderTargetView* renderTarget[1] = { mBrdfMap->GetRenderTargetView() };
+        mImmediateContext->OMSetRenderTargets(1, renderTarget, 0);
+
+        XMVECTORF32 clearColor = { 0.0f, 1.0f, 1.0f, 1.0f };
+        mImmediateContext->ClearRenderTargetView(mBrdfMap->GetRenderTargetView(), (float*)&clearColor);
+        {
+            D3DX11_TECHNIQUE_DESC techDesc;
+            mBrdfTechnique->GetDesc(&techDesc);
+            for (UINT p = 0; p < techDesc.Passes; ++p)
+            {
+                mBrdfTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                mImmediateContext->Draw(6, 0);
+            }
+        }
+        mViewport.TopLeftX = 0;
+        mViewport.TopLeftY = 0;
+        mViewport.Width = mClientWidth;
+        mViewport.Height = mClientHeight;
+        mViewport.MinDepth = 0.0f;
+        mViewport.MaxDepth = 1.0f;
+        mImmediateContext->RSSetViewports(1, &mViewport);
+    }
+
     // Set the cubemap to the shader
-    mFxCubeMap->SetResource(mCubeMapSRV);
-    mCubeMap->SetResource(mCubeMapSRV);
+    mFxIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
+    mFxPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
+    mFxBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
+
+    mSkyCubeMap->SetResource(mEnviromentMap->GetShaderResourceView());
+
 
     return true;
 }
@@ -399,17 +726,26 @@ void FPSDemo::UpdateScene(float dt)
     XMMATRIX world = XMMatrixRotationY(angle) * XMMatrixRotationX(angle * 2.0f);
     XMStoreFloat4x4(&mWorld, world);
 
-    XMVECTOR target = XMVectorZero();
+    XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
 
     // Build the view matrix.
-    XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 2.0f, sinf(angle) * 20.0f);
-    //XMFLOAT3 eyePos = XMFLOAT3(0, 0.0f, 6.0f);
-    XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 0.0f);
+    XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 10.0f, sinf(angle) * 20.0f);
+    XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
+    XMVECTOR target = XMVectorSet(targetDir.x, targetDir.y, targetDir.z, 0.0f);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
     XMStoreFloat4x4(&mView, V);
     mFxEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
+
+    static float timer = 0.0f;
+
+    timer += dt;
+    if (timer >= 4.0f)
+    {
+        timer = 0.0f;
+    }
+    mSkyTimer->SetRawValue(&timer, 0, sizeof(float));
 
     //mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, 6, cosf(angle) * 5.0f);
     //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
@@ -420,6 +756,7 @@ void FPSDemo::UpdateScene(float dt)
 
 void FPSDemo::DrawScene()
 {
+#if 1
     mImmediateContext->IASetInputLayout(mInputLayout);
     mImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -501,9 +838,6 @@ void FPSDemo::DrawScene()
         }
     }
     
-    //
-    // Restore the back and depth buffer to the OM stage.
-    //
 
     ID3D11RenderTargetView* frameBuffers[2] = { mFrameBuffers[0]->GetRenderTargetView(), mFrameBuffers[1]->GetRenderTargetView()};
     mImmediateContext->OMSetRenderTargets(2, frameBuffers, mDepthStencilView);
@@ -522,7 +856,6 @@ void FPSDemo::DrawScene()
 
         // Set constants
         XMMATRIX viewProj = XMLoadFloat4x4(&mView) * XMLoadFloat4x4(&mProj);
-
         D3DX11_TECHNIQUE_DESC techDesc;
         mTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
@@ -636,17 +969,16 @@ void FPSDemo::DrawScene()
             }
         }
 
-        mCubemapTechnique->GetDesc(&techDesc);
+        mSkyTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 2.0f, sinf(angle) * 20.0f);
+            XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 10.0f, sinf(angle) * 20.0f);
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
-            mCubemapWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
-            mCubemapTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+            mSkyWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+            mSkyTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
             mSky.Draw(mImmediateContext, 0);
         }
-
     }
 
     mImmediateContext->RSSetState(0);
@@ -716,7 +1048,7 @@ void FPSDemo::DrawScene()
     // The shadow might might be at any slot, so clear all slots.
     ID3D11ShaderResourceView* nullSRV[16] = { 0 };
     mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
-
+#endif
     mSwapChain->Present(1, 0);
 
 

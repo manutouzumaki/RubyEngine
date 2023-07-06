@@ -71,19 +71,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Dev\RubyEngine\libs\stb_image;D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\Dev\RubyEngine\libs\FX11\Bin\Desktop_2022_Win10\x64\Debug;D:\Dev\RubyEngine\libs\D3DX11\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Dev\RubyEngine\libs\stb_image;D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\Dev\RubyEngine\libs\D3DX11\Release;D:\Dev\RubyEngine\libs\FX11\Bin\Desktop_2022_Win10\x64\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Dev\RubyEngine\libs\stb_image;D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\Dev\RubyEngine\libs\FX11\Bin\Desktop_2022_Win10\x64\Debug;D:\Dev\RubyEngine\libs\D3DX11\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Dev\RubyEngine\libs\stb_image;D:\Dev\RubyEngine\libs\D3DX11\Include;D:\Dev\RubyEngine\libs\FX11\inc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\Dev\RubyEngine\libs\D3DX11\Release;D:\Dev\RubyEngine\libs\FX11\Bin\Desktop_2022_Win10\x64\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

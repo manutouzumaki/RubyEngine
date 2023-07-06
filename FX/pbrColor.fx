@@ -38,7 +38,10 @@ cbuffer cbPerObject
 };
 
 Texture2D gShadowMap;
-TextureCube gCubeMap;
+
+TextureCube gIrradianceMap;
+TextureCube gPrefilteredColor;
+Texture2D gBrdfLUT;
 
 SamplerState samLinear
 {
@@ -145,6 +148,11 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+float3 fresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    return F0 + (max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 struct PixelOut
 {
     float4 Color : SV_Target0;
@@ -152,7 +160,7 @@ struct PixelOut
 };
 
 PixelOut PS(VertexOut pin)
-{
+{    
     float shadow = ShadowCalculation(pin.FragPosLightSpace);
     
     float3 Albedo = gMaterial.Albedo.rgb;
@@ -164,6 +172,7 @@ PixelOut PS(VertexOut pin)
     
     float3 N = normalize(pin.NormalW);
     float3 V = normalize(gEyePosW - pin.PosW);
+    float3 R = reflect(-V, N);
     
     float3 F0 = float3(0.04f, 0.04f, 0.04f);
     F0 = lerp(F0, Albedo, Metallic);
@@ -214,23 +223,34 @@ PixelOut PS(VertexOut pin)
     }
     // ambient lighting (note that the next IBL tutorial will replace 
     // this ambient lighting with environment lighting).
-    float3 ambient = float3(0.03f, 0.03f, 0.03f) * Albedo * Ao;
+    //float3 ambient = float3(0.03f, 0.03f, 0.03f) * Albedo * Ao;
+    
+    float3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, Roughness);
+    
+    float3 kS = F;
+    float3 kD = 1.0f - kS;
+    kD *= 1.0f - Metallic;
+    float3 irradiance = gIrradianceMap.Sample(samLinear, N).rgb;
+    float3 diffuse = irradiance * Albedo;
+    
+    const float MAX_REFLECTION_LOD = 4.0;
+    float3 prefilteredColor = gPrefilteredColor.SampleLevel(samLinear, R, Roughness * MAX_REFLECTION_LOD).rgb;
+    float2 brdf = gBrdfLUT.Sample(samLinear, float2(max(dot(N, V), 0.0f), Roughness)).rg;
+    float3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+    
+    
+    float3 ambient = (kD * diffuse + specular) * Ao;
+    
 
     float3 color = ambient + ((1.0f - shadow) * Lo);
-    //float3 color = ambient + Lo;
-
+    
     if (gMaterial.Albedo.w == 0.0f)
     {
         color = gMaterial.Albedo.rgb;
     }
     
     PixelOut output;
-    
-    // HDR tonemapping
-    //color = color / (color + float3(1.0f, 1.0f, 1.0f));
-    // gamma correct
-    //color = pow(abs(color), float3(1.0f / 2.2f, 1.0f / 2.2f, 1.0f / 2.2f));
-
+       
     output.Color = float4(color, 1.0f);
     
     float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
@@ -239,8 +259,8 @@ PixelOut PS(VertexOut pin)
     else
         output.Bright = float4(0.0, 0.0, 0.0, 1.0);
     
-    
     return output;
+
 }
 
 technique11 ColorTech
