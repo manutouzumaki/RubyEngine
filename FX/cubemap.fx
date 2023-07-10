@@ -119,11 +119,11 @@ float4 PS(VertexOut pin) : SV_Target
         float3 L = normalize(2.0 * dot(V, H) * H - V);
 
         float NdotL = max(dot(N, L), 0.0);
-        if (NdotL > 0.0)
-        {            
+        //if (NdotL > 0.0)
+        //{            
             prefilteredColor += gCubeMap.Sample(samTrilinearSam, SampleSphericalMap(L)).rgb * NdotL;
             totalWeight += NdotL;
-        }
+        //}
     }
         
     prefilteredColor = prefilteredColor / totalWeight;

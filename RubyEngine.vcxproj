@@ -160,6 +160,7 @@
     <ClCompile Include="Demo\PBRDemo.cpp" />
     <ClCompile Include="RubyApp.cpp" />
     <ClCompile Include="RubyMesh.cpp" />
+    <ClCompile Include="RubyScene.cpp" />
     <ClCompile Include="RubyTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -173,6 +174,7 @@
     <ClInclude Include="RubyApp.h" />
     <ClInclude Include="RubyFrameBuffer.h" />
     <ClInclude Include="RubyMesh.h" />
+    <ClInclude Include="RubyScene.h" />
     <ClInclude Include="RubyTimer.h" />
     <ClInclude Include="ShadowMap.h" />
   </ItemGroup>

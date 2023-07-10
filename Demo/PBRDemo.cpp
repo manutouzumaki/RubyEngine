@@ -52,8 +52,6 @@ bool PBRDemo::Init()
         std::vector<Ruby::MeshGeometry::Subset> subsetTable;
         Ruby::MeshGeometry::Subset subset;
         subset.Id = 0;
-        subset.VertexStart = 0;
-        subset.VertexCount = meshData.Vertices.size();
         subset.IndexStart = 0;
         subset.IndexCount = meshData.Indices.size();
         subsetTable.push_back(subset);

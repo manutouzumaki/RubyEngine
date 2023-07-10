@@ -90,7 +90,7 @@ namespace Ruby
 
     MeshGeometry::MeshGeometry()
     {
-    
+
     }
 
     MeshGeometry::~MeshGeometry()
@@ -102,6 +102,7 @@ namespace Ruby
     template<typename VertexType>
     void MeshGeometry::SetVertices(ID3D11Device* device, const VertexType* vertices, UINT count)
     {
+        if (mVB) mVB->Release();
 
         D3D11_BUFFER_DESC vbd;
         vbd.Usage = D3D11_USAGE_IMMUTABLE;
@@ -124,6 +125,8 @@ namespace Ruby
 
     void MeshGeometry::SetIndices(ID3D11Device* device, const USHORT* indices, UINT count)
     {
+        if (mIB) mIB->Release();
+
         D3D11_BUFFER_DESC ibd;
         ibd.Usage = D3D11_USAGE_IMMUTABLE;
         ibd.ByteWidth = sizeof(USHORT) * count;
@@ -146,6 +149,12 @@ namespace Ruby
     {
         mSubsetTable = subsetTable;
     }
+
+    std::vector<Ruby::MeshGeometry::Subset>& MeshGeometry::GetSubsetTable()
+    {
+        return mSubsetTable;
+    }
+
 
     void MeshGeometry::Draw(ID3D11DeviceContext* dc, UINT subsetId)
     {
@@ -215,15 +224,11 @@ namespace Ruby
             MeshGeometry::Subset subset;
 
             subset.Id = subsetId++;
-            subset.VertexStart = Vertices.size();
-            subset.VertexCount = positions.size();
-
             subset.IndexStart = Indices.size();
             subset.IndexCount = indices.size();
 
             subsetTable.push_back(subset);
 
-            // this probably are going to be deleted when drawing using Subsets
             USHORT indexOffset = Vertices.size();
             for (UINT i = 0; i < indices.size(); ++i)
             {
@@ -297,5 +302,207 @@ namespace Ruby
     Mesh::~Mesh()
     {
     
+    }
+
+    float Line::Lenght()
+    {
+        XMVECTOR A = XMVectorSet(a.x, a.y, a.z, 1.0f);
+        XMVECTOR B = XMVectorSet(b.x, b.y, b.z, 1.0f);
+        XMVECTOR AB = B - A;
+        XMVECTOR dot = XMVector3Dot(AB, AB);
+        XMFLOAT3 dotFloat;
+        XMStoreFloat3(&dotFloat, dot);
+        return sqrtf(dotFloat.x);
+    }
+
+    float Line::LenghtSq()
+    {
+        XMVECTOR A = XMVectorSet(a.x, a.y, a.z, 1.0f);
+        XMVECTOR B = XMVectorSet(b.x, b.y, b.z, 1.0f);
+        XMVECTOR AB = B - A;
+        XMVECTOR dot = XMVector3Dot(AB, AB);
+        XMFLOAT3 dotFloat;
+        XMStoreFloat3(&dotFloat, dot);
+        return dotFloat.x;
+    }
+
+    int Line::IntersectPlane(Plane& plane, float& t)
+    {
+        XMVECTOR A = XMVectorSet(a.x, a.y, a.z, 1.0f);
+        XMVECTOR B = XMVectorSet(b.x, b.y, b.z, 1.0f);
+        XMVECTOR N = XMVectorSet(plane.n.x, plane.n.y, plane.n.z, 0.0f);
+        XMVECTOR D = XMVectorSet(plane.d, plane.d, plane.d, 0.0f);
+        XMVECTOR dot = (D - XMVector3Dot(N, A)) / XMVector3Dot(N, B - A);
+        XMFLOAT3 dotFloat;
+        XMStoreFloat3(&dotFloat, dot);
+
+        t = dotFloat.x;
+
+        if (t >= 0.0f && t <= 1.0f)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    Vertex LerpVertex(Vertex a, Vertex b, float t)
+    {
+        XMVECTOR pos0 = XMVectorSet(a.Position.x, a.Position.y, a.Position.z, 1.0f);
+        XMVECTOR nor0 = XMVectorSet(a.Normal.x, a.Normal.y, a.Normal.z, 0.0f);
+        XMVECTOR tan0 = XMVectorSet(a.TangentU.x, a.TangentU.y, a.TangentU.z, 0.0f);
+        XMVECTOR tex0 = XMVectorSet(a.TexC.x, a.TexC.y, 0.0f, 0.0f);
+
+        XMVECTOR pos1 = XMVectorSet(b.Position.x, b.Position.y, b.Position.z, 1.0f);
+        XMVECTOR nor1 = XMVectorSet(b.Normal.x, b.Normal.y, b.Normal.z, 0.0f);
+        XMVECTOR tan1 = XMVectorSet(b.TangentU.x, b.TangentU.y, b.TangentU.z, 0.0f);
+        XMVECTOR tex1 = XMVectorSet(b.TexC.x, b.TexC.y, 0.0f, 0.0f);
+
+        XMVECTOR pos = (1.0f - t) * pos0 + t * pos1;
+        XMVECTOR nor = XMVector3Normalize((1.0f - t) * nor0 + t * nor1);
+        XMVECTOR tan = XMVector3Normalize((1.0f - t) * tan0 + t * tan1);
+        XMVECTOR tex = (1.0f - t) * tex0 + t * tex1;
+
+        Vertex vertex{};
+        
+        XMStoreFloat3(&vertex.Position, pos);
+        XMStoreFloat3(&vertex.Normal, nor);
+        XMStoreFloat3(&vertex.TangentU, tan);
+        XMStoreFloat2(&vertex.TexC, tex);
+
+        return vertex;
+    }
+
+    Mesh* Mesh::Clip(ID3D11Device* device, Plane& plane)
+    {
+        Mesh* result = new Mesh();
+        result->Mat = Mat;
+        result->Vertices = Vertices;
+
+        std::vector<USHORT> indices;
+        std::vector<MeshGeometry::Subset>& subsets = ModelMesh.GetSubsetTable();
+        std::vector<MeshGeometry::Subset> newSubsets;
+
+        XMVECTOR N = XMVector3Normalize(XMVectorSet(plane.n.x, plane.n.y, plane.n.z, 0.0f));
+        XMStoreFloat3(&plane.n, N);
+
+        for (int j = 0; j < subsets.size(); ++j)
+        {
+            MeshGeometry::Subset subset = subsets[j];
+            UINT indexStart = indices.size();
+            // for each triangle, try to clip it to the plane
+            for (int i = subset.IndexStart; i < (subset.IndexStart + subset.IndexCount); i += 3)
+            {
+                // first need to see if the triangle intersect the plane
+                // we thest the tree edges
+                XMFLOAT3 vert0 = Vertices[Indices[i + 0]].Position;
+                XMFLOAT3 vert1 = Vertices[Indices[i + 1]].Position;
+                XMFLOAT3 vert2 = Vertices[Indices[i + 2]].Position;
+
+                Line edges[3] = {
+                    { vert0, vert1 },
+                    { vert1, vert2 },
+                    { vert2, vert0 }
+                };
+                Vertex triangleVertex[6] = {
+                    Vertices[Indices[i + 0]], Vertices[Indices[i + 1]],
+                    Vertices[Indices[i + 1]], Vertices[Indices[i + 2]],
+                    Vertices[Indices[i + 2]], Vertices[Indices[i + 0]]
+                };
+                USHORT triangleIndices[6] = {
+                    Indices[i + 0], Indices[i + 1],
+                    Indices[i + 1], Indices[i + 2],
+                    Indices[i + 2], Indices[i + 0]
+                };
+                
+                UINT vertexIndex = 0;
+
+                std::vector<USHORT> newIndices;
+
+                for (int edgeIndex = 0; edgeIndex < 3; ++edgeIndex)
+                {
+                    Line edge = edges[edgeIndex];
+                    
+                    XMVECTOR A = XMVectorSet(edge.a.x, edge.a.y, edge.a.z, 1.0f);
+                    XMVECTOR B = XMVectorSet(edge.b.x, edge.b.y, edge.b.z, 1.0f);
+
+                    XMVECTOR O = N * plane.d;
+
+
+                    XMVECTOR dotA = XMVector3Dot(A - O, N);
+                    XMVECTOR dotB = XMVector3Dot(B - O, N);
+
+                    XMFLOAT3 dotAFloat;
+                    XMStoreFloat3(&dotAFloat, dotA);
+
+                    XMFLOAT3 dotBFloat;
+                    XMStoreFloat3(&dotBFloat, dotB);
+
+                    Vertex vertexA = triangleVertex[vertexIndex + 0];
+                    Vertex vertexB = triangleVertex[vertexIndex + 1];
+                    USHORT indexA = triangleIndices[vertexIndex + 0];
+                    USHORT indexB = triangleIndices[vertexIndex + 1];
+
+                    // we dont want to recreate the vertices, we want to add new vertices and reac reate the indices
+                    if (dotAFloat.x >= 0.0f && dotBFloat.x >= 0.0f)
+                    {
+                        // Here we know the edge not intersect the plane
+                        newIndices.push_back(indexB);
+                    }
+                    else if (dotAFloat.x >= 0.0f && dotBFloat.x < 0.0f)
+                    {
+                        float t = 0.0f;
+                        edge.IntersectPlane(plane, t);
+                        // for now just interpolate the position
+                        Vertex vertex = LerpVertex(vertexA, vertexB, t);
+                        newIndices.push_back(result->Vertices.size());
+                        result->Vertices.push_back(vertex);
+                    }
+                    else if (dotAFloat.x < 0.0f && dotBFloat.x < 0.0f)
+                    {
+                        // Here we know the edge not intersect the plane
+                    }
+                    else if (dotAFloat.x < 0.0f && dotBFloat.x >= 0.0f)
+                    {
+                        float t = 0.0f;
+                        edge.IntersectPlane(plane, t);
+                        Vertex vertex = LerpVertex(vertexA, vertexB, t);
+                        newIndices.push_back(result->Vertices.size());
+                        newIndices.push_back(indexB);
+                        result->Vertices.push_back(vertex);
+                    }
+
+                    vertexIndex += 2;
+
+                }
+
+                // now we have the clip rectangle
+                // but we need to triagulize this becouse its not a triangle any more
+                if (newIndices.size() >= 4)
+                {
+                    indices.push_back(newIndices[0]);
+                    indices.push_back(newIndices[1]);
+                    indices.push_back(newIndices[2]);
+
+                    indices.push_back(newIndices[0]);
+                    indices.push_back(newIndices[2]);
+                    indices.push_back(newIndices[3]);
+                }
+                else
+                {
+                    for (int index = 0; index < newIndices.size(); ++index)
+                    {
+                        indices.push_back(newIndices[index]);
+                    }
+                }
+            }
+            subset.IndexStart = indexStart;
+            subset.IndexCount = indices.size() - subset.IndexStart;
+            newSubsets.push_back(subset);
+        }
+        result->ModelMesh.SetVertices(device, result->Vertices.data(), result->Vertices.size());
+        result->ModelMesh.SetIndices(device, indices.data(), indices.size());
+        result->ModelMesh.SetSubsetTable(newSubsets);
+        result->Indices = indices;
+        return result;
     }
 }

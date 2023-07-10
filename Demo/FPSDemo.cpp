@@ -73,6 +73,8 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mMesh[3]);
     SAFE_DELETE(mMesh[4]);
     SAFE_DELETE(mMesh[5]);
+    SAFE_DELETE(mMesh[6]);
+
 
     SAFE_RELEASE(mHdrSkyTexture2D);
     SAFE_RELEASE(mHdrSkySRV);
@@ -122,12 +124,109 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
-    mMesh[0] = new Ruby::Mesh(mDevice, "./assets/level1.gltf", "./assets/level1.bin", "./");
+    mMesh[0] = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
+#if 0
     mMesh[1] = new Ruby::Mesh(mDevice, "./assets/sphere.gltf",   "./assets/sphere.bin",  "./");
     mMesh[2] = new Ruby::Mesh(mDevice, "./assets/mono.gltf",   "./assets/mono.bin",  "./");
     mMesh[3] = new Ruby::Mesh(mDevice, "./assets/level.gltf",  "./assets/level.bin", "./");
     mMesh[4] = new Ruby::Mesh(mDevice, "./assets/cube.gltf", "./assets/cube.bin", "./");
     mMesh[5] = new Ruby::Mesh(mDevice, "./assets/castel.gltf", "./assets/castel.bin", "./");
+#endif
+#if 1
+    // try to split the mesh
+
+    float meshWidth = 25.5f;
+    float meshDepth = 25.7f;
+
+    float stepZ = meshDepth / 3.0f;
+
+    float centerZ = -6.4f;
+    float centerX = 2.6f;
+
+    // 1
+    Ruby::Plane plane;
+
+    plane.d = centerX;
+    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
+    mMesh[1] = mMesh[0]->Clip(mDevice, plane);
+
+    Ruby::Mesh* tmp = mMesh[1];
+    plane.d = (centerZ + (meshDepth*0.5f)) - stepZ;
+    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
+    mMesh[1] = mMesh[1]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+
+    // 2
+    plane.d = centerX;
+    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
+    mMesh[2] = mMesh[0]->Clip(mDevice, plane);
+
+    tmp = mMesh[2];
+    plane.d = -((centerZ + (meshDepth * 0.5f)) - stepZ);
+    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
+    mMesh[2] = mMesh[2]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+    tmp = mMesh[2];
+    plane.d = (centerZ + (meshDepth * 0.5f) - stepZ*2.0f);
+    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
+    mMesh[2] = mMesh[2]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+    // 3
+    plane.d = centerX;
+    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
+    mMesh[3] = mMesh[0]->Clip(mDevice, plane);
+
+    tmp = mMesh[3];
+    plane.d = -((centerZ + (meshDepth * 0.5f) - stepZ * 2.0f));
+    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
+    mMesh[3] = mMesh[3]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+    // 4
+    plane.d = -centerX;
+    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
+    mMesh[4] = mMesh[0]->Clip(mDevice, plane);
+
+    tmp = mMesh[4];
+    plane.d = (centerZ + (meshDepth * 0.5f)) - stepZ;
+    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
+    mMesh[4] = mMesh[4]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+
+    // 5
+    plane.d = -centerX;
+    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
+    mMesh[5] = mMesh[0]->Clip(mDevice, plane);
+
+    tmp = mMesh[5];
+    plane.d = -((centerZ + (meshDepth * 0.5f)) - stepZ);
+    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
+    mMesh[5] = mMesh[5]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+    tmp = mMesh[5];
+    plane.d = (centerZ + (meshDepth * 0.5f) - stepZ * 2.0f);
+    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
+    mMesh[5] = mMesh[5]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+    // 6
+    plane.d = -centerX;
+    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
+    mMesh[6] = mMesh[0]->Clip(mDevice, plane);
+
+    tmp = mMesh[6];
+    plane.d = -((centerZ + (meshDepth * 0.5f) - stepZ * 2.0f));
+    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
+    mMesh[6] = mMesh[6]->Clip(mDevice, plane);
+    SAFE_DELETE(tmp);
+
+#endif
+
 
     for (int row = 0; row < gNrRows; ++row)
     {
@@ -148,8 +247,8 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -215,8 +314,6 @@ bool FPSDemo::Init()
 
         std::vector<Ruby::MeshGeometry::Subset> subsetTable;
         Ruby::MeshGeometry::Subset subset{};
-        subset.VertexStart = 0;
-        subset.VertexCount = box.Vertices.size();
         subset.IndexStart = 0;
         subset.IndexCount = box.Indices.size();
         subsetTable.push_back(subset);
@@ -249,8 +346,8 @@ bool FPSDemo::Init()
     DWORD shaderFlags = 0;
 #if defined( DEBUG ) || defined( _DEBUG )
     shaderFlags |= D3D10_SHADER_DEBUG;
-    shaderFlags |= D3D10_SHADER_SKIP_OPTIMIZATION;
 #endif
+    shaderFlags |= D3D10_SHADER_SKIP_OPTIMIZATION;
     
     // Create Color Effect
     {
@@ -475,7 +572,7 @@ bool FPSDemo::Init()
         mSkyCubeMap = mSkyEffect->GetVariableByName("gCubeMap")->AsShaderResource();
         mSkyTimer = mSkyEffect->GetVariableByName("gTimer");
     }
-    // Create HDR Effect
+    // Create BRDF Effect
     {
         ID3D10Blob* compiledShader = 0;
         ID3D10Blob* compilationMsgs = 0;
@@ -523,7 +620,7 @@ bool FPSDemo::Init()
     XMStoreFloat4x4(&mProj, P);
 
     // Build the view matrix.
-    XMFLOAT3 eyePos = XMFLOAT3(10.0f, 20.0f, -10.0f);
+    XMFLOAT3 eyePos = XMFLOAT3(10.0f, 5.0f, -10.0f);
     //XMFLOAT3 eyePos = XMFLOAT3(0, 0.0f, 6.0f);
     XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 0.0f);
     XMVECTOR target = XMVectorZero();
@@ -729,7 +826,7 @@ void FPSDemo::UpdateScene(float dt)
     XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
 
     // Build the view matrix.
-    XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 10.0f, sinf(angle) * 20.0f);
+    XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 5.0f, sinf(angle) * 20.0f);
     XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
     XMVECTOR target = XMVectorSet(targetDir.x, targetDir.y, targetDir.z, 0.0f);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -747,6 +844,11 @@ void FPSDemo::UpdateScene(float dt)
     }
     mSkyTimer->SetRawValue(&timer, 0, sizeof(float));
 
+#if 0
+    char buffer[256];
+    wsprintf(buffer, "FPS: %d\n", (DWORD)(1.0f / dt));
+    OutputDebugStringA(buffer);
+#endif
     //mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, 6, cosf(angle) * 5.0f);
     //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
@@ -780,9 +882,10 @@ void FPSDemo::DrawScene()
         mDepthTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
+#if 0
             // draw mesh 0
             {
-                XMMATRIX world = XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(-2.0f, 3.99f, -2.0f);
+                XMMATRIX world = XMMatrixTranslation(-2.0f, 3.99f, -2.0f);
                 mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
                 Ruby::Mesh* mesh = mMesh[0];
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
@@ -835,6 +938,30 @@ void FPSDemo::DrawScene()
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
+        
+#endif
+            float width = 0.0f;
+            for (int indexX = 0; indexX < 2; ++indexX)
+            {
+                float depth = 0.0f;
+                for (int indexZ = 0; indexZ < 3; ++indexZ)
+                {
+
+                    int index = (indexX * 3 + indexZ) + 1;
+                    XMMATRIX world = XMMatrixTranslation(width, 0, depth);
+                    mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                    Ruby::Mesh* mesh = mMesh[index];
+                    for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                    {
+                        mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                        mesh->ModelMesh.Draw(mImmediateContext, i);
+                    }
+                    depth -= 1.0f;
+                }
+                width -= 1.0f;
+            }
+            
+
         }
     }
     
@@ -860,6 +987,7 @@ void FPSDemo::DrawScene()
         mTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
+#if 0
             // draw mesh 3
             {
                 XMMATRIX world = XMMatrixRotationY(XM_PIDIV4) * XMMatrixTranslation(8, 0.127f, -10.0f);
@@ -878,7 +1006,7 @@ void FPSDemo::DrawScene()
             }
             // draw mesh 0
             {
-                XMMATRIX world = XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(-2.0f, 3.99f, -2.0f);
+                XMMATRIX world = XMMatrixTranslation(-2.0f, 3.99f, -2.0f);
                 XMMATRIX worldInvTranspose = InverseTranspose(world);
                 XMMATRIX worldViewProj = (world * XMMatrixTranslation(0, -2, 0)) * viewProj;
                 mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
@@ -933,7 +1061,6 @@ void FPSDemo::DrawScene()
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
-
             // draw mesh 4
             {
                 //XMMATRIX world = XMMatrixScaling(10.0f, 0.0000000001f, 10.0f) * XMMatrixTranslation(0, 0, 0);
@@ -967,12 +1094,41 @@ void FPSDemo::DrawScene()
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
+#endif
+            float width = 0.0f;
+            for (int indexX = 0; indexX < 2; ++indexX)
+            {
+                float depth = 0.0f;
+                for (int indexZ = 0; indexZ < 3; ++indexZ)
+                {
+
+                    int index = (indexX * 3 + indexZ) + 1;
+
+                    XMMATRIX world = XMMatrixTranslation(width, 0, depth);
+                    XMMATRIX worldInvTranspose = InverseTranspose(world);
+                    XMMATRIX worldViewProj = world * viewProj;
+                    mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                    mFxWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+                    mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+                    Ruby::Mesh* mesh = mMesh[index];
+                    for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                    {
+                        mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                        mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                        mesh->ModelMesh.Draw(mImmediateContext, i);
+                    }
+                    depth -= 1.0f;
+                }
+                width -= 1.0f;
+            }
+            
+
         }
 
         mSkyTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 10.0f, sinf(angle) * 20.0f);
+            XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 5.0f, sinf(angle) * 20.0f);
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
             mSkyWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));

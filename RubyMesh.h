@@ -2,7 +2,6 @@
 
 #include <d3d11.h>
 #include <d3dx11.h>
-#include <d3dx11Effect.h>
 #include <DirectXMath.h>
 
 #include <vector>
@@ -13,6 +12,23 @@
 
 namespace Ruby
 {
+    struct Plane
+    {
+        XMFLOAT3 n;
+        float d; // dot(n, a): a is a point on the plane
+    };
+
+    struct Line
+    {
+        XMFLOAT3 a;
+        XMFLOAT3 b;
+
+        int IntersectPlane(Plane& plane, float& t);
+        float Lenght();
+        float LenghtSq();
+    };
+
+
     class MeshGeometry
     {
     public:
@@ -20,12 +36,9 @@ namespace Ruby
         {
             Subset()
                 : Id(-1),
-                VertexStart(0), VertexCount(0),
                 IndexStart(0), IndexCount(0) {}
 
             UINT Id;
-            UINT VertexStart;
-            UINT VertexCount;
             UINT IndexStart;
             UINT IndexCount;
         };
@@ -36,6 +49,7 @@ namespace Ruby
         void SetVertices(ID3D11Device* device, const VertexType* vertices, UINT count);
         void SetIndices(ID3D11Device* device, const USHORT* indices, UINT count);
         void SetSubsetTable(std::vector<Subset>& subsetTable);
+        std::vector<Subset>& GetSubsetTable();
         void Draw(ID3D11DeviceContext* dc, UINT subsetId);
     private:
         MeshGeometry(const MeshGeometry& rhs);
@@ -61,11 +75,9 @@ namespace Ruby
             std::string textureFilepath);
         ~Mesh();
 
-        UINT SubsetCount;
-        //std::vector<Material> Mat;
+        Mesh* Clip(ID3D11Device* device, Plane& plane);
+
         std::vector<Pbr::Material> Mat;
-        std::vector<ID3D11ShaderResourceView*> DiffuseMapSRV;
-        std::vector<ID3D11ShaderResourceView*> NormalMapSRV;
 
         std::vector<Vertex> Vertices;
         std::vector<USHORT> Indices;
@@ -73,7 +85,6 @@ namespace Ruby
 
         MeshGeometry ModelMesh;
     };
-
 }
 
 

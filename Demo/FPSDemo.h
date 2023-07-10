@@ -104,7 +104,7 @@ private:
     Ruby::FrameBuffer* mBrdfMap;
 
 
-    Ruby::Mesh* mMesh[6];
+    Ruby::Mesh* mMesh[7];
 
     ShadowMap* mShadowMap;
     Ruby::FrameBuffer* mFrameBuffers[2];
