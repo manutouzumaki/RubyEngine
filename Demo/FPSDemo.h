@@ -5,6 +5,8 @@
 
 #include "../ShadowMap.h"
 #include "../RubyFrameBuffer.h"
+#include "../RubyScene.h"
+#include "../RubyCamera.h"
 
 class FPSDemo : public Ruby::App
 {
@@ -28,6 +30,10 @@ public:
     void OnMouseMove(WPARAM btnState, int x, int y);
     void OnKeyDown(WPARAM vkCode);
     void OnKeyUp(WPARAM vkCode);
+
+    void SplitGeometry(Ruby::Mesh* mesh,
+        Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
+        Ruby::Mesh* fullMesh);
 
 
 private:
@@ -104,7 +110,8 @@ private:
     Ruby::FrameBuffer* mBrdfMap;
 
 
-    Ruby::Mesh* mMesh[7];
+    Ruby::Mesh* mMesh[1000];
+    UINT mMeshCount;
 
     ShadowMap* mShadowMap;
     Ruby::FrameBuffer* mFrameBuffers[2];
@@ -114,5 +121,22 @@ private:
     Ruby::Pbr::PointLight mPointLight;
 
     ID3D11ShaderResourceView* mCubeMapSRV;
+
+    Ruby::Scene* mScene;
+
+    int mMousePositionX;
+    int mMousePositionY;
+
+    bool mMouseDown;
+    bool mWPress;
+    bool mSPress;
+    bool mAPress;
+    bool mDPress;
+    bool mRPress;
+    bool mFPress;
+
+    float mDeltaTime;
+
+    Ruby::FPSCamera* mCamera;
 
 };

@@ -18,23 +18,86 @@ static XMMATRIX InverseTranspose(CXMMATRIX M)
 
 void FPSDemo::OnMouseDown(WPARAM btnState, int x, int y)
 {
-
+    SetCapture(mWindow);
+    mMouseDown = true;
+    mMousePositionX = x - mClientWidth / 2;
+    mMousePositionY = y - mClientHeight / 2;
 }
 void FPSDemo::OnMouseUp(WPARAM btnState, int x, int y)
 {
-
+    mMousePositionX = x - mClientWidth / 2;
+    mMousePositionY = y - mClientHeight / 2;
+    mMouseDown = false;
+    ReleaseCapture();
 }
 void FPSDemo::OnMouseMove(WPARAM btnState, int x, int y)
 {
+    if (mMouseDown)
+    {
+        mMousePositionX = x - mClientWidth/2;
+        mMousePositionY = y - mClientHeight/2;
+        SetCursorPos(mWindowX + mClientWidth/2, mWindowY + mClientHeight/2);
+    }
+    else
+    {
+        mMousePositionX = 0.0f;
+        mMousePositionY = 0.0f;
+    }
 
 }
 void FPSDemo::OnKeyDown(WPARAM vkCode)
 {
-
+    if (vkCode == 'W')
+    {
+        mWPress = true;
+    }
+    if (vkCode == 'S')
+    {
+        mSPress = true;
+    }
+    if (vkCode == 'A')
+    {
+        mAPress = true;
+    }
+    if (vkCode == 'D')
+    {
+        mDPress = true;
+    }
+    if (vkCode == 'R')
+    {
+        mRPress = true;
+    }
+    if (vkCode == 'F')
+    {
+        mFPress = true;
+    }
 }
 void FPSDemo::OnKeyUp(WPARAM vkCode)
 {
-
+    if (vkCode == 'W')
+    {
+        mWPress = false;
+    }
+    if (vkCode == 'S')
+    {
+        mSPress = false;
+    }
+    if (vkCode == 'A')
+    {
+        mAPress = false;
+    }
+    if (vkCode == 'D')
+    {
+        mDPress = false;
+    }
+    if (vkCode == 'R')
+    {
+        mRPress = false;
+    }
+    if (vkCode == 'F')
+    {
+        mFPress = false;
+    }
 }
 
 FPSDemo::FPSDemo(HINSTANCE instance,
@@ -50,13 +113,16 @@ FPSDemo::FPSDemo(HINSTANCE instance,
     mMesh()
 {
     XMMATRIX identity = XMMatrixIdentity();
-    XMStoreFloat4x4(&mWorld, identity);
-    XMStoreFloat4x4(&mView, identity);
-    XMStoreFloat4x4(&mProj, identity);
+    DirectX::XMStoreFloat4x4(&mWorld, identity);
+    DirectX::XMStoreFloat4x4(&mView, identity);
+    DirectX::XMStoreFloat4x4(&mProj, identity);
 }
 
 FPSDemo::~FPSDemo()
 {
+    SAFE_DELETE(mCamera);
+    SAFE_DELETE(mScene);
+
     SAFE_DELETE(mEnviromentMap);
     SAFE_DELETE(mIrradianceMap);
 
@@ -67,13 +133,11 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mShadowMap);
     SAFE_DELETE(mBrdfMap);
 
-    SAFE_DELETE(mMesh[0]);
-    SAFE_DELETE(mMesh[1]);
-    SAFE_DELETE(mMesh[2]);
-    SAFE_DELETE(mMesh[3]);
-    SAFE_DELETE(mMesh[4]);
-    SAFE_DELETE(mMesh[5]);
-    SAFE_DELETE(mMesh[6]);
+
+    for (int i = 0; i < 100; ++i)
+    {
+        SAFE_DELETE(mMesh[i]);
+    }
 
 
     SAFE_RELEASE(mHdrSkyTexture2D);
@@ -106,6 +170,56 @@ static const int gNrRows = 7;
 static const int gNrCols = 7;
 static const float gSpacing = 1.2f;
 
+void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
+                   Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
+                   Ruby::Mesh* fullMesh)
+{
+    if(node->pChild[0] == nullptr)
+    {        
+        float halfWidth = node->halfWidth;
+
+        // we should clip the geometry to the 6 cube faces form by the center and the halfWidht
+
+        Ruby::Plane faces[6] = {
+            
+            {XMFLOAT3(1, 0,   0), node->center.x - halfWidth},
+            {XMFLOAT3(-1,  0,  0), -node->center.x - halfWidth},
+            {XMFLOAT3(0, 1,   0), node->center.y - halfWidth},
+            {XMFLOAT3(0, -1,  0), -node->center.y - halfWidth},
+            {XMFLOAT3(0, 0,   1), node->center.z - halfWidth},
+            {XMFLOAT3(0, 0,  -1), -node->center.z - halfWidth},
+            
+        };
+        mMesh[mMeshCount] = mMesh[999];
+#if 1
+        for (int i = 0; i < 6; ++i)
+        {
+            Ruby::Mesh* tmp = nullptr;
+            if (i > 0) tmp = mMesh[mMeshCount];
+            mMesh[mMeshCount] = mMesh[mMeshCount]->Clip(mDevice, faces[i]);
+            SAFE_DELETE(tmp);
+            if (mMesh[mMeshCount] == nullptr)
+            {
+                break;
+            }
+        }
+        if (mMesh[mMeshCount] != nullptr)
+        {
+            ++mMeshCount;
+            assert(mMeshCount < 1000);
+        }
+#endif
+    }
+    else
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            SplitGeometry(mesh, node->pChild[i], fullMesh);
+        }
+    }
+
+
+}
 
 bool FPSDemo::Init()
 {
@@ -124,7 +238,7 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
-    mMesh[0] = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
+    mMesh[999] = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
 #if 0
     mMesh[1] = new Ruby::Mesh(mDevice, "./assets/sphere.gltf",   "./assets/sphere.bin",  "./");
     mMesh[2] = new Ruby::Mesh(mDevice, "./assets/mono.gltf",   "./assets/mono.bin",  "./");
@@ -132,16 +246,40 @@ bool FPSDemo::Init()
     mMesh[4] = new Ruby::Mesh(mDevice, "./assets/cube.gltf", "./assets/cube.bin", "./");
     mMesh[5] = new Ruby::Mesh(mDevice, "./assets/castel.gltf", "./assets/castel.bin", "./");
 #endif
-#if 1
+
+    XMFLOAT3 min, max;
+    mMesh[999]->GetBoundingBox(min, max);
+    
+    float meshWidth = max.x - min.x;
+    float meshDepth = max.z - min.z;
+
+    float centerZ = 0;
+    float centerX = 0;
+
+    mScene = new Ruby::Scene(XMFLOAT3(0.008616f, 0.0f, -0.024896f), meshDepth * 0.5f, 3);
+
+    // TODO: try to split the level geometry using the octree as division planes
+
+    Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
+
+    // go to the deepest level to and split the geometry
+    SplitGeometry(mMesh[999], octree->mRoot, mMesh[999]);
+
+
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 10, -40), XMFLOAT3(0, 0, 0), 4.0f);
+
+    int StopHere = 0;
+
+
+
+#if 0
     // try to split the mesh
 
-    float meshWidth = 25.5f;
-    float meshDepth = 25.7f;
+
 
     float stepZ = meshDepth / 3.0f;
 
-    float centerZ = -6.4f;
-    float centerX = 2.6f;
+
 
     // 1
     Ruby::Plane plane;
@@ -617,7 +755,7 @@ bool FPSDemo::Init()
 
     // set proj matrices
     XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
-    XMStoreFloat4x4(&mProj, P);
+    DirectX::XMStoreFloat4x4(&mProj, P);
 
     // Build the view matrix.
     XMFLOAT3 eyePos = XMFLOAT3(10.0f, 5.0f, -10.0f);
@@ -627,7 +765,7 @@ bool FPSDemo::Init()
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-    XMStoreFloat4x4(&mView, V);
+    DirectX::XMStoreFloat4x4(&mView, V);
 
     mFxEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
 
@@ -635,7 +773,7 @@ bool FPSDemo::Init()
 
     mDirLight.Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     XMVECTOR lightDir = XMVector3Normalize(lightPos);
-    XMStoreFloat3(&mDirLight.Direction, lightDir);
+    DirectX::XMStoreFloat3(&mDirLight.Direction, lightDir);
     mFxDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
 
     // Point light--position is changed every frame to animate in UpdateScene function.
@@ -800,8 +938,8 @@ void FPSDemo::OnResize()
 {
     Ruby::App::OnResize();
     // set proj matrices
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
-    XMStoreFloat4x4(&mProj, P);
+    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 0.01f, 1000.0f);
+    DirectX::XMStoreFloat4x4(&mProj, P);
 
     if(mFrameBuffers[0])
         mFrameBuffers[0]->Resize(mDevice, mClientWidth, mClientHeight);
@@ -818,21 +956,55 @@ void FPSDemo::OnResize()
 
 void FPSDemo::UpdateScene(float dt)
 {
+    mDeltaTime = dt;
+    int deltaX = mMousePositionX;
+    int deltaY = mMousePositionY;
+
+    if (mWPress)
+    {
+        mCamera->MoveForward(mDeltaTime);
+    }
+    if (mSPress)
+    {
+        mCamera->MoveBackward(mDeltaTime);
+    }
+    if (mAPress)
+    {
+        mCamera->MoveLeft(mDeltaTime);
+    }
+    if (mDPress)
+    {
+        mCamera->MoveRight(mDeltaTime);
+    }
+    if (mRPress)
+    {
+        mCamera->MoveUp(mDeltaTime);
+    }
+    if (mFPress)
+    {
+        mCamera->MoveDown(mDeltaTime);
+    }
+
+    mCamera->MouseMove((float)deltaX*0.001f, (float)deltaY*0.001f);
+    mCamera->Update(dt);
+
     angle += 0.5f * dt;
 
     XMMATRIX world = XMMatrixRotationY(angle) * XMMatrixRotationX(angle * 2.0f);
-    XMStoreFloat4x4(&mWorld, world);
+    DirectX::XMStoreFloat4x4(&mWorld, world);
 
     XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
 
     // Build the view matrix.
-    XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 5.0f, sinf(angle) * 20.0f);
+    //XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 50.0f, 20.0f, sinf(angle) * 50.0f);
+    XMFLOAT3 eyePos = mCamera->GetPosition();
+
     XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
     XMVECTOR target = XMVectorSet(targetDir.x, targetDir.y, targetDir.z, 0.0f);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-    XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-    XMStoreFloat4x4(&mView, V);
+    XMMATRIX V = mCamera->GetView();
+    DirectX::XMStoreFloat4x4(&mView, V);
     mFxEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
 
     static float timer = 0.0f;
@@ -853,8 +1025,6 @@ void FPSDemo::UpdateScene(float dt)
     //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
 }
-
-
 
 void FPSDemo::DrawScene()
 {
@@ -940,27 +1110,26 @@ void FPSDemo::DrawScene()
             }
         
 #endif
-            float width = 0.0f;
-            for (int indexX = 0; indexX < 2; ++indexX)
+#if 1
+            static float count = 0.0f;
+            count += 0.1f;
+            if (count >= (float)mMeshCount + 1)
             {
-                float depth = 0.0f;
-                for (int indexZ = 0; indexZ < 3; ++indexZ)
-                {
-
-                    int index = (indexX * 3 + indexZ) + 1;
-                    XMMATRIX world = XMMatrixTranslation(width, 0, depth);
-                    mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                    Ruby::Mesh* mesh = mMesh[index];
-                    for (UINT i = 0; i < mesh->Mat.size(); ++i)
-                    {
-                        mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
-                        mesh->ModelMesh.Draw(mImmediateContext, i);
-                    }
-                    depth -= 1.0f;
-                }
-                width -= 1.0f;
+                count = 0.0f;
             }
-            
+
+            for (int index = 0; index < mMeshCount; ++index)
+            {
+                XMMATRIX world = XMMatrixTranslation(0, 0, 0);
+                mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                Ruby::Mesh* mesh = mMesh[index];
+                for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                {
+                    mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mesh->ModelMesh.Draw(mImmediateContext, i);
+                }
+            }
+#endif
 
         }
     }
@@ -1095,32 +1264,31 @@ void FPSDemo::DrawScene()
                 }
             }
 #endif
-            float width = 0.0f;
-            for (int indexX = 0; indexX < 2; ++indexX)
+
+#if 1
+            static float count = 0.0f;
+            count += 0.1f;
+            if (count >= (float)mMeshCount + 1)
             {
-                float depth = 0.0f;
-                for (int indexZ = 0; indexZ < 3; ++indexZ)
-                {
-
-                    int index = (indexX * 3 + indexZ) + 1;
-
-                    XMMATRIX world = XMMatrixTranslation(width, 0, depth);
-                    XMMATRIX worldInvTranspose = InverseTranspose(world);
-                    XMMATRIX worldViewProj = world * viewProj;
-                    mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                    mFxWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
-                    mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
-                    Ruby::Mesh* mesh = mMesh[index];
-                    for (UINT i = 0; i < mesh->Mat.size(); ++i)
-                    {
-                        mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
-                        mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
-                        mesh->ModelMesh.Draw(mImmediateContext, i);
-                    }
-                    depth -= 1.0f;
-                }
-                width -= 1.0f;
+                count = 0.0f;
             }
+            for (int index = 0; index < mMeshCount; ++index)
+            {
+                XMMATRIX world = XMMatrixTranslation(0, 0, 0);
+                XMMATRIX worldInvTranspose = InverseTranspose(world);
+                XMMATRIX worldViewProj = world * viewProj;
+                mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                mFxWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+                mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+                Ruby::Mesh* mesh = mMesh[index];
+                for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                {
+                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                    mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mesh->ModelMesh.Draw(mImmediateContext, i);
+                }
+            }
+#endif
             
 
         }
@@ -1128,7 +1296,9 @@ void FPSDemo::DrawScene()
         mSkyTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 20.0f, 5.0f, sinf(angle) * 20.0f);
+            //XMFLOAT3 eyePos = XMFLOAT3(0.0f, 20.0f, -50.0f);
+            //XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 50.0f, 20.0f, sinf(angle) * 50.0f);
+            XMFLOAT3 eyePos = mCamera->GetPosition();
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
             mSkyWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));

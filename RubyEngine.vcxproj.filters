@@ -48,6 +48,9 @@
     <ClCompile Include="RubyScene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RubyCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RubyApp.h">
@@ -87,6 +90,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RubyScene.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RubyCamera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

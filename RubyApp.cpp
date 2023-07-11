@@ -161,7 +161,13 @@ namespace Ruby
     {
         switch (msg)
         {
-
+        case WM_CREATE:
+        {
+            CREATESTRUCTA* windowInfo = (CREATESTRUCTA*)lParam;
+            mWindowX = windowInfo->x;
+            mWindowY = windowInfo->y;
+            return 0;
+        }
         case WM_ACTIVATE:
             if (LOWORD(wParam) == WA_INACTIVE)
             {
@@ -275,9 +281,16 @@ namespace Ruby
             if (isDown != wasDown) OnKeyUp(wParam);
             return 0;
         }
+        case WM_MOVE:
+        {
+            mWindowX = (UINT)(short)LOWORD(lParam);
+            mWindowY = (UINT)(short)HIWORD(lParam);
+            return 0;
+        }
 
 
         }
+
 
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }

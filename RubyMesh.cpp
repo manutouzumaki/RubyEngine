@@ -289,9 +289,6 @@ namespace Ruby
             Mat.push_back(material);
         }
 
-
-
-
         delete bin.data;
 
         ModelMesh.SetVertices<Vertex>(device, Vertices.data(), Vertices.size());
@@ -374,6 +371,9 @@ namespace Ruby
 
     Mesh* Mesh::Clip(ID3D11Device* device, Plane& plane)
     {
+        // TODO: not create a IndexBuffer when it its nothing to draw
+        // use a single vertexBuffer with all the vertex
+
         Mesh* result = new Mesh();
         result->Mat = Mat;
         result->Vertices = Vertices;
@@ -499,10 +499,56 @@ namespace Ruby
             subset.IndexCount = indices.size() - subset.IndexStart;
             newSubsets.push_back(subset);
         }
+        if (indices.size() == 0) return nullptr;
         result->ModelMesh.SetVertices(device, result->Vertices.data(), result->Vertices.size());
         result->ModelMesh.SetIndices(device, indices.data(), indices.size());
         result->ModelMesh.SetSubsetTable(newSubsets);
         result->Indices = indices;
         return result;
+    }
+
+    void Mesh::GetBoundingBox(XMFLOAT3& min, XMFLOAT3& max)
+    {
+        float minX = FLT_MAX;
+        float maxX = 0.0f;
+        float minY = FLT_MAX;
+        float maxY = 0.0f;
+        float minZ = FLT_MAX;
+        float maxZ = 0.0f;
+
+        for (int i = 0; i < Vertices.size(); ++i)
+        {
+            XMFLOAT3 vertexP = Vertices[i].Position;
+
+            if (vertexP.x < minX)
+            {
+                minX = vertexP.x;
+            }
+            if (vertexP.x > maxX)
+            {
+                maxX = vertexP.x;
+            }
+
+            if (vertexP.y < minY)
+            {
+                minY = vertexP.y;
+            }
+            if (vertexP.y > maxY)
+            {
+                maxY = vertexP.y;
+            }
+
+            if (vertexP.z < minZ)
+            {
+                minZ = vertexP.z;
+            }
+            if (vertexP.z > maxZ)
+            {
+                maxZ = vertexP.z;
+            }
+        }
+
+        min = XMFLOAT3(minX, minY, minZ);
+        max = XMFLOAT3(maxX, maxY, maxZ);
     }
 }

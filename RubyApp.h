@@ -73,6 +73,8 @@ namespace Ruby
         UINT mClientWidth;
         UINT mClientHeight;
         bool mEnable4xMsaa;
+        UINT mWindowX;
+        UINT mWindowY;
     };
 
 

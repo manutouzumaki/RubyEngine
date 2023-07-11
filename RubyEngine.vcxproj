@@ -159,6 +159,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Demo\PBRDemo.cpp" />
     <ClCompile Include="RubyApp.cpp" />
+    <ClCompile Include="RubyCamera.cpp" />
     <ClCompile Include="RubyMesh.cpp" />
     <ClCompile Include="RubyScene.cpp" />
     <ClCompile Include="RubyTimer.cpp" />
@@ -172,6 +173,7 @@
     <ClInclude Include="LightHelper.h" />
     <ClInclude Include="Demo\PBRDemo.h" />
     <ClInclude Include="RubyApp.h" />
+    <ClInclude Include="RubyCamera.h" />
     <ClInclude Include="RubyFrameBuffer.h" />
     <ClInclude Include="RubyMesh.h" />
     <ClInclude Include="RubyScene.h" />
