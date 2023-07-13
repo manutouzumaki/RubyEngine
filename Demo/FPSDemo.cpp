@@ -15,91 +15,6 @@ static XMMATRIX InverseTranspose(CXMMATRIX M)
     return XMMatrixTranspose(XMMatrixInverse(&det, A));
 }
 
-
-void FPSDemo::OnMouseDown(WPARAM btnState, int x, int y)
-{
-    SetCapture(mWindow);
-    mMouseDown = true;
-    mMousePositionX = x - mClientWidth / 2;
-    mMousePositionY = y - mClientHeight / 2;
-}
-void FPSDemo::OnMouseUp(WPARAM btnState, int x, int y)
-{
-    mMousePositionX = x - mClientWidth / 2;
-    mMousePositionY = y - mClientHeight / 2;
-    mMouseDown = false;
-    ReleaseCapture();
-}
-void FPSDemo::OnMouseMove(WPARAM btnState, int x, int y)
-{
-    if (mMouseDown)
-    {
-        mMousePositionX = x - mClientWidth/2;
-        mMousePositionY = y - mClientHeight/2;
-        SetCursorPos(mWindowX + mClientWidth/2, mWindowY + mClientHeight/2);
-    }
-    else
-    {
-        mMousePositionX = 0.0f;
-        mMousePositionY = 0.0f;
-    }
-
-}
-void FPSDemo::OnKeyDown(WPARAM vkCode)
-{
-    if (vkCode == 'W')
-    {
-        mWPress = true;
-    }
-    if (vkCode == 'S')
-    {
-        mSPress = true;
-    }
-    if (vkCode == 'A')
-    {
-        mAPress = true;
-    }
-    if (vkCode == 'D')
-    {
-        mDPress = true;
-    }
-    if (vkCode == 'R')
-    {
-        mRPress = true;
-    }
-    if (vkCode == 'F')
-    {
-        mFPress = true;
-    }
-}
-void FPSDemo::OnKeyUp(WPARAM vkCode)
-{
-    if (vkCode == 'W')
-    {
-        mWPress = false;
-    }
-    if (vkCode == 'S')
-    {
-        mSPress = false;
-    }
-    if (vkCode == 'A')
-    {
-        mAPress = false;
-    }
-    if (vkCode == 'D')
-    {
-        mDPress = false;
-    }
-    if (vkCode == 'R')
-    {
-        mRPress = false;
-    }
-    if (vkCode == 'F')
-    {
-        mFPress = false;
-    }
-}
-
 FPSDemo::FPSDemo(HINSTANCE instance,
     UINT clientWidth, 
     UINT clientHeight,
@@ -121,6 +36,7 @@ FPSDemo::FPSDemo(HINSTANCE instance,
 FPSDemo::~FPSDemo()
 {
     SAFE_DELETE(mCamera);
+
     SAFE_DELETE(mScene);
 
     SAFE_DELETE(mEnviromentMap);
@@ -134,7 +50,7 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mBrdfMap);
 
 
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < 1000; ++i)
     {
         SAFE_DELETE(mMesh[i]);
     }
@@ -191,7 +107,7 @@ void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
             
         };
         mMesh[mMeshCount] = mMesh[999];
-#if 1
+
         for (int i = 0; i < 6; ++i)
         {
             Ruby::Mesh* tmp = nullptr;
@@ -208,7 +124,7 @@ void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
             ++mMeshCount;
             assert(mMeshCount < 1000);
         }
-#endif
+
     }
     else
     {
@@ -270,102 +186,6 @@ bool FPSDemo::Init()
 
     int StopHere = 0;
 
-
-
-#if 0
-    // try to split the mesh
-
-
-
-    float stepZ = meshDepth / 3.0f;
-
-
-
-    // 1
-    Ruby::Plane plane;
-
-    plane.d = centerX;
-    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
-    mMesh[1] = mMesh[0]->Clip(mDevice, plane);
-
-    Ruby::Mesh* tmp = mMesh[1];
-    plane.d = (centerZ + (meshDepth*0.5f)) - stepZ;
-    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
-    mMesh[1] = mMesh[1]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-
-    // 2
-    plane.d = centerX;
-    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
-    mMesh[2] = mMesh[0]->Clip(mDevice, plane);
-
-    tmp = mMesh[2];
-    plane.d = -((centerZ + (meshDepth * 0.5f)) - stepZ);
-    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
-    mMesh[2] = mMesh[2]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-    tmp = mMesh[2];
-    plane.d = (centerZ + (meshDepth * 0.5f) - stepZ*2.0f);
-    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
-    mMesh[2] = mMesh[2]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-    // 3
-    plane.d = centerX;
-    plane.n = XMFLOAT3(1.0f, 0.0f, 0.0f);
-    mMesh[3] = mMesh[0]->Clip(mDevice, plane);
-
-    tmp = mMesh[3];
-    plane.d = -((centerZ + (meshDepth * 0.5f) - stepZ * 2.0f));
-    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
-    mMesh[3] = mMesh[3]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-    // 4
-    plane.d = -centerX;
-    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
-    mMesh[4] = mMesh[0]->Clip(mDevice, plane);
-
-    tmp = mMesh[4];
-    plane.d = (centerZ + (meshDepth * 0.5f)) - stepZ;
-    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
-    mMesh[4] = mMesh[4]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-
-    // 5
-    plane.d = -centerX;
-    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
-    mMesh[5] = mMesh[0]->Clip(mDevice, plane);
-
-    tmp = mMesh[5];
-    plane.d = -((centerZ + (meshDepth * 0.5f)) - stepZ);
-    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
-    mMesh[5] = mMesh[5]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-    tmp = mMesh[5];
-    plane.d = (centerZ + (meshDepth * 0.5f) - stepZ * 2.0f);
-    plane.n = XMFLOAT3(0.0f, 0.0f, 1.0f);
-    mMesh[5] = mMesh[5]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-    // 6
-    plane.d = -centerX;
-    plane.n = XMFLOAT3(-1.0f, 0.0f, 0.0f);
-    mMesh[6] = mMesh[0]->Clip(mDevice, plane);
-
-    tmp = mMesh[6];
-    plane.d = -((centerZ + (meshDepth * 0.5f) - stepZ * 2.0f));
-    plane.n = XMFLOAT3(0.0f, 0.0f, -1.0f);
-    mMesh[6] = mMesh[6]->Clip(mDevice, plane);
-    SAFE_DELETE(tmp);
-
-#endif
-
-
     for (int row = 0; row < gNrRows; ++row)
     {
         float matallic = (float)row / (float)gNrRows;
@@ -385,8 +205,8 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -954,39 +774,62 @@ void FPSDemo::OnResize()
         mPinPongFrameBuffers[1]->Resize(mDevice, mClientWidth, mClientHeight);
 }
 
-void FPSDemo::UpdateScene(float dt)
+void FPSDemo::UpdateScene()
 {
-    mDeltaTime = dt;
-    int deltaX = mMousePositionX;
-    int deltaY = mMousePositionY;
+    float dt = mTimer.DeltaTime();
 
-    if (mWPress)
+    if (mInput.KeyIsDown('W'))
     {
-        mCamera->MoveForward(mDeltaTime);
+        mCamera->MoveForward(dt);
     }
-    if (mSPress)
+    if (mInput.KeyIsDown('S'))
     {
-        mCamera->MoveBackward(mDeltaTime);
+        mCamera->MoveBackward(dt);
     }
-    if (mAPress)
+    if (mInput.KeyIsDown('A'))
     {
-        mCamera->MoveLeft(mDeltaTime);
+        mCamera->MoveLeft(dt);
     }
-    if (mDPress)
+    if (mInput.KeyIsDown('D'))
     {
-        mCamera->MoveRight(mDeltaTime);
+        mCamera->MoveRight(dt);
     }
-    if (mRPress)
+    if (mInput.KeyIsDown('R'))
     {
-        mCamera->MoveUp(mDeltaTime);
+        mCamera->MoveUp(dt);
     }
-    if (mFPress)
+    if (mInput.KeyIsDown('F'))
     {
-        mCamera->MoveDown(mDeltaTime);
+        mCamera->MoveDown(dt);
     }
 
-    mCamera->MouseMove((float)deltaX*0.001f, (float)deltaY*0.001f);
+    if (mInput.MouseButtonJustDown(1))
+    {
+        ShowCursor(false);
+    }
+    if (mInput.MouseButtonJustUp(1))
+    {
+        ShowCursor(true);
+    }
+
+    if (mInput.MouseButtonIsDown(1))
+    {
+        int deltaX = mInput.MousePosX() - mInput.MouseLastPosX();
+        int deltaY = mInput.MousePosY() - mInput.MouseLastPosY();
+
+        mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f);
+
+        SetCursorPos(mWindowX + mClientWidth / 2, mWindowY + mClientHeight / 2);
+        mInput.mCurrent.mouseX = mClientWidth / 2;
+        mInput.mCurrent.mouseY = mClientHeight / 2;
+        mInput.mLast.mouseX = mClientWidth / 2;
+        mInput.mLast.mouseY = mClientHeight / 2;
+
+    }
+
     mCamera->Update(dt);
+
+
 
     angle += 0.5f * dt;
 
@@ -1023,7 +866,6 @@ void FPSDemo::UpdateScene(float dt)
 #endif
     //mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, 6, cosf(angle) * 5.0f);
     //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
-
 }
 
 void FPSDemo::DrawScene()

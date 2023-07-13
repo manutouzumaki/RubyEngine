@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "RubyTimer.h"
+#include "RubyInput.h"
 #include "GeometryGenerator.h"
 
 using namespace DirectX;
@@ -28,12 +29,13 @@ namespace Ruby
         HWND Window();
         float AspectRatio();
         int Run();
+        void FlushEvents();
 
         // framework methods. derived client class overrides this methos
         // to implement specifics application requirements
         virtual bool Init();
         virtual void OnResize();
-        virtual void UpdateScene(float dt) = 0;
+        virtual void UpdateScene() = 0;
         virtual void DrawScene() = 0;
        
         virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -55,9 +57,11 @@ namespace Ruby
         bool      mMinimized;
         bool      mMaximized;
         bool      mResizing;
+        bool      mRunning;
         UINT      m4xMsaaQuality;
 
         Timer mTimer;
+        Input mInput;
 
         ID3D11Device* mDevice;
         ID3D11DeviceContext* mImmediateContext; // this is for single threading, try the deferred contex for multithreading
@@ -73,6 +77,7 @@ namespace Ruby
         UINT mClientWidth;
         UINT mClientHeight;
         bool mEnable4xMsaa;
+
         UINT mWindowX;
         UINT mWindowY;
     };

@@ -20,6 +20,7 @@ namespace Ruby
         mDriverType(D3D_DRIVER_TYPE_HARDWARE),
         mEnable4xMsaa(enable4xMsaa),
         mWindow(0),
+        mRunning(false),
         mPause(false),
         mMinimized(false),
         mMaximized(false),
@@ -61,35 +62,131 @@ namespace Ruby
     {
         return (float)mClientWidth / (float)mClientHeight;
     }
-    int App::Run()
+
+    void App::FlushEvents()
     {
         MSG msg = {};
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            switch (msg.message) {
+            case WM_QUIT: {
+                mRunning = false;
+            } break;
+
+            case WM_KEYDOWN:
+            case WM_SYSKEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYUP: {
+                bool wasDown = ((msg.lParam & (1 << 30)) != 0);
+                bool isDown = ((msg.lParam & (1 << 31)) == 0);
+                if (isDown != wasDown) {
+                    DWORD vkCode = (DWORD)msg.wParam;
+                    mInput.mCurrent.keys[vkCode].isPress = isDown;
+                }
+            }break;
+            case WM_MOUSEMOVE: {
+                mInput.mCurrent.mouseX = (int)GET_X_LPARAM(msg.lParam);
+                mInput.mCurrent.mouseY = (int)GET_Y_LPARAM(msg.lParam);
+            }break;
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MBUTTONDOWN:
+            case WM_MBUTTONUP: {
+                mInput.mCurrent.mouseButtons[0].isPress = ((msg.wParam & MK_LBUTTON) != 0);
+                mInput.mCurrent.mouseButtons[2].isPress = ((msg.wParam & MK_MBUTTON) != 0);
+                mInput.mCurrent.mouseButtons[1].isPress = ((msg.wParam & MK_RBUTTON) != 0);
+            }break;
+            
+            /*
+            case WM_LBUTTONDOWN:
+            case WM_MBUTTONDOWN:
+            case WM_RBUTTONDOWN:
+            {
+                OnMouseDown(msg.wParam, GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam));
+            } break;
+            case WM_LBUTTONUP:
+            case WM_MBUTTONUP:
+            case WM_RBUTTONUP:
+            {
+                OnMouseUp(msg.wParam, GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam));
+            } break;
+            case WM_MOUSEMOVE:
+            {
+                OnMouseMove(msg.wParam, GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam));
+            } break;
+
+            case WM_KEYDOWN:
+            case WM_SYSKEYDOWN:
+            {
+                bool wasDown = ((msg.lParam & (1 << 30)) != 0);
+                bool isDown = ((msg.lParam & (1 << 31)) == 0);
+                if (isDown != wasDown) OnKeyDown(msg.wParam);
+
+            } break;
+            case WM_KEYUP:
+            case WM_SYSKEYUP:
+            {
+                bool wasDown = ((msg.lParam & (1 << 30)) != 0);
+                bool isDown = ((msg.lParam & (1 << 31)) == 0);
+                if (isDown != wasDown) OnKeyUp(msg.wParam);
+            } break;
+            */
+            default: {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }break;
+            }
+        }
+
+
+        for (int i = 0; i < 349; ++i)
+        {
+            mInput.mCurrent.keys[i].wasPress = false;
+            if (mInput.mLast.keys[i].isPress)
+            {
+                mInput.mCurrent.keys[i].wasPress = true;
+            }
+        }
+
+        for (int i = 0; i < 3; ++i)
+        {
+            mInput.mCurrent.mouseButtons[i].wasPress = false;
+            if (mInput.mLast.mouseButtons[i].isPress)
+            {
+                mInput.mCurrent.mouseButtons[i].wasPress = true;
+            }
+        }
+
+    }
+
+    int App::Run()
+    {
 
         mTimer.Reset();
 
-        while (msg.message != WM_QUIT)
+        mRunning = true;
+
+        while (mRunning)
         {
-            if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+            FlushEvents();
+
+            mTimer.Tick();
+
+            if (!mPause)
             {
-                TranslateMessage(&msg);
-                DispatchMessageA(&msg);
+                UpdateScene();
+                DrawScene();
             }
             else
             {
-                mTimer.Tick();
-
-                if (!mPause)
-                {
-                    UpdateScene(mTimer.DeltaTime());
-                    DrawScene();
-                }
-                else
-                {
-                    Sleep(100);
-                }
+                Sleep(100);
             }
+
+            mInput.mLast = mInput.mCurrent;
+
         }
-        return (int)msg.wParam;
+        return 0;
     }
 
 
@@ -250,7 +347,7 @@ namespace Ruby
             ((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
             ((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
             return 0;
-
+/*
         case WM_LBUTTONDOWN:
         case WM_MBUTTONDOWN:
         case WM_RBUTTONDOWN:
@@ -281,13 +378,14 @@ namespace Ruby
             if (isDown != wasDown) OnKeyUp(wParam);
             return 0;
         }
+        */
         case WM_MOVE:
         {
             mWindowX = (UINT)(short)LOWORD(lParam);
             mWindowY = (UINT)(short)HIWORD(lParam);
             return 0;
         }
-
+        
 
         }
 

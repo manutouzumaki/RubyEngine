@@ -22,14 +22,8 @@ public:
 
     bool Init();
     void OnResize();
-    void UpdateScene(float dt);
+    void UpdateScene();
     void DrawScene();
-
-    void OnMouseDown(WPARAM btnState, int x, int y);
-    void OnMouseUp(WPARAM btnState, int x, int y);
-    void OnMouseMove(WPARAM btnState, int x, int y);
-    void OnKeyDown(WPARAM vkCode);
-    void OnKeyUp(WPARAM vkCode);
 
     void SplitGeometry(Ruby::Mesh* mesh,
         Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
@@ -123,19 +117,6 @@ private:
     ID3D11ShaderResourceView* mCubeMapSRV;
 
     Ruby::Scene* mScene;
-
-    int mMousePositionX;
-    int mMousePositionY;
-
-    bool mMouseDown;
-    bool mWPress;
-    bool mSPress;
-    bool mAPress;
-    bool mDPress;
-    bool mRPress;
-    bool mFPress;
-
-    float mDeltaTime;
 
     Ruby::FPSCamera* mCamera;
 

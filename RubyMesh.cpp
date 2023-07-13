@@ -499,7 +499,11 @@ namespace Ruby
             subset.IndexCount = indices.size() - subset.IndexStart;
             newSubsets.push_back(subset);
         }
-        if (indices.size() == 0) return nullptr;
+        if (indices.size() == 0)
+        {
+            delete result;
+            return nullptr;
+        }
         result->ModelMesh.SetVertices(device, result->Vertices.data(), result->Vertices.size());
         result->ModelMesh.SetIndices(device, indices.data(), indices.size());
         result->ModelMesh.SetSubsetTable(newSubsets);
