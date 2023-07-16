@@ -11,7 +11,7 @@
 class FPSDemo : public Ruby::App
 {
 public:
-    
+
     FPSDemo(HINSTANCE instance,
         UINT clientWidth,
         UINT clientHeight,
@@ -31,7 +31,7 @@ public:
 
 
 private:
-    
+
     ID3D11RasterizerState* mRasterizerStateBackCull;
     ID3D11RasterizerState* mRasterizerStateFrontCull;
 
@@ -91,9 +91,6 @@ private:
     XMFLOAT4X4 mWorld;
     XMFLOAT4X4 mView;
     XMFLOAT4X4 mProj;
-
-
-    Ruby::Pbr::Material mMaterials[49];
 
     Ruby::MeshGeometry mSky;
     ID3D11Texture2D* mHdrSkyTexture2D;

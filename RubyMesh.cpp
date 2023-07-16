@@ -1,6 +1,12 @@
 #include "RubyMesh.h"
 
 #include "JsonParser/JsonParser.h"
+//#include "RubyDebugProfiler.h"
+
+// SSE2
+#define M(a, i) ((float *)&(a))[i]
+#define Mi(a, i) ((int *)&(a))[i]
+#define Mu(a, i) ((unsigned int *)&(a))[i]
 
 namespace Ruby
 {
@@ -89,6 +95,7 @@ namespace Ruby
 {
 
     MeshGeometry::MeshGeometry()
+        : mVB(nullptr), mIB(nullptr)
     {
 
     }
@@ -342,6 +349,11 @@ namespace Ruby
         return 0;
     }
 
+    inline float Lerp(float a, float b, float t)
+    {
+        return (1.0f - t) * a + t * b;
+    }
+
     Vertex LerpVertex(Vertex a, Vertex b, float t)
     {
         XMVECTOR pos0 = XMVectorSet(a.Position.x, a.Position.y, a.Position.z, 1.0f);
@@ -354,10 +366,17 @@ namespace Ruby
         XMVECTOR tan1 = XMVectorSet(b.TangentU.x, b.TangentU.y, b.TangentU.z, 0.0f);
         XMVECTOR tex1 = XMVectorSet(b.TexC.x, b.TexC.y, 0.0f, 0.0f);
 
+#if 1
         XMVECTOR pos = (1.0f - t) * pos0 + t * pos1;
         XMVECTOR nor = XMVector3Normalize((1.0f - t) * nor0 + t * nor1);
         XMVECTOR tan = XMVector3Normalize((1.0f - t) * tan0 + t * tan1);
         XMVECTOR tex = (1.0f - t) * tex0 + t * tex1;
+#else
+        XMVECTOR pos = (1.0f - t) * pos0 + t * pos1;
+        XMVECTOR nor = (1.0f - t) * nor0 + t * nor1;
+        XMVECTOR tan = (1.0f - t) * tan0 + t * tan1;
+        XMVECTOR tex = (1.0f - t) * tex0 + t * tex1;
+#endif
 
         Vertex vertex{};
         
@@ -369,6 +388,227 @@ namespace Ruby
         return vertex;
     }
 
+// this one os broken but it takes only tree sec so try to make it work ...
+#if 1
+    Mesh* Mesh::Clip(ID3D11Device* device, Plane& plane)
+    {
+        // TODO: not create a IndexBuffer when it its nothing to draw
+        // use a single vertexBuffer with all the vertex
+        Mesh* result = new Mesh();
+        result->Mat = Mat;
+        result->Vertices = Vertices;
+        result->Vertices.reserve(Vertices.size() * 2);
+
+
+        UINT32 subsetCount = ModelMesh.GetSubsetTable().size();
+        MeshGeometry::Subset* subsets = ModelMesh.GetSubsetTable().data();
+        MeshGeometry::Subset* newSubsets = (MeshGeometry::Subset*)malloc(sizeof(MeshGeometry::Subset) * subsetCount);
+
+        USHORT* indices = (USHORT*)malloc(sizeof(USHORT) * Indices.size() * 2);
+        UINT indicesCount = 0;
+        
+        XMVECTOR N = XMVector3Normalize(XMVectorSet(plane.n.x, plane.n.y, plane.n.z, 0.0f));
+        XMStoreFloat3(&plane.n, N);
+
+        for (int j = 0; j < subsetCount; ++j)
+        {
+            MeshGeometry::Subset subset = subsets[j];
+            UINT indexStart = indicesCount;
+            // for each triangle, try to clip it to the plane
+            for (int i = subset.IndexStart; i < (subset.IndexStart + subset.IndexCount); i += 3)
+            {
+                // first need to see if the triangle intersect the plane
+                // we thest the tree edges
+                XMFLOAT3 vert0 = Vertices[Indices[i + 0]].Position;
+                XMFLOAT3 vert1 = Vertices[Indices[i + 1]].Position;
+                XMFLOAT3 vert2 = Vertices[Indices[i + 2]].Position;
+
+                Line edges[3] = {
+                    { vert0, vert1 },
+                    { vert1, vert2 },
+                    { vert2, vert0 }
+                };
+                Vertex triangleVertex[6] = {
+                    Vertices[Indices[i + 0]], Vertices[Indices[i + 1]],
+                    Vertices[Indices[i + 1]], Vertices[Indices[i + 2]],
+                    Vertices[Indices[i + 2]], Vertices[Indices[i + 0]]
+                };
+                USHORT triangleIndices[6] = {
+                    Indices[i + 0], Indices[i + 1],
+                    Indices[i + 1], Indices[i + 2],
+                    Indices[i + 2], Indices[i + 0]
+                };
+
+                UINT vertexIndex = 0;
+
+                USHORT newIndices[4];
+                UINT newIncicesCount = 0;
+
+                for (int edgeIndex = 0; edgeIndex < 3; ++edgeIndex)
+                {
+                    Line edge = edges[edgeIndex];
+                    
+                    XMVECTOR A = XMVectorSet(edge.a.x, edge.a.y, edge.a.z, 1.0f);
+                    XMVECTOR B = XMVectorSet(edge.b.x, edge.b.y, edge.b.z, 1.0f);
+
+                    XMVECTOR O = N * plane.d;
+
+                    XMVECTOR dotA = XMVector3Dot(A - O, N);
+                    XMVECTOR dotB = XMVector3Dot(B - O, N);
+
+                    XMFLOAT3 dotAFloat;
+                    XMStoreFloat3(&dotAFloat, dotA);
+
+                    XMFLOAT3 dotBFloat;
+                    XMStoreFloat3(&dotBFloat, dotB);
+
+                    Vertex vertexA = triangleVertex[vertexIndex + 0];
+                    
+                    __m128 one = _mm_set1_ps(1.0f);
+
+                    __m128 posA = _mm_set_ps(1.0f, vertexA.Position.z, vertexA.Position.y, vertexA.Position.x);
+
+                    __m128 norA = _mm_set_ps(0.0f, vertexA.Normal.z, vertexA.Normal.y, vertexA.Normal.x);
+                    __m128 tanA = _mm_set_ps(0.0f, vertexA.TangentU.z, vertexA.TangentU.y, vertexA.TangentU.x);
+                    __m128 texA = _mm_set_ps(0.0f, 0.0f, vertexA.TexC.y, vertexA.TexC.x);
+
+                    Vertex vertexB = triangleVertex[vertexIndex + 1];
+
+                    __m128 posB = _mm_set_ps(1.0f, vertexB.Position.z, vertexB.Position.y, vertexB.Position.x);
+                    __m128 norB = _mm_set_ps(0.0f, vertexB.Normal.z, vertexB.Normal.y, vertexB.Normal.x);
+                    __m128 tanB = _mm_set_ps(0.0f, vertexB.TangentU.z, vertexB.TangentU.y, vertexB.TangentU.x);
+                    __m128 texB = _mm_set_ps(0.0f, 0.0f, vertexB.TexC.y, vertexB.TexC.x);
+
+                    USHORT indexA = triangleIndices[vertexIndex + 0];
+                    USHORT indexB = triangleIndices[vertexIndex + 1];
+
+                    // we dont want to recreate the vertices, we want to add new vertices and reac reate the indices
+                    if (dotAFloat.x >= 0.0f && dotBFloat.x >= 0.0f)
+                    {
+                        // Here we know the edge not intersect the plane
+                        newIndices[newIncicesCount++] = indexB;
+                    }
+                    else if (dotAFloat.x >= 0.0f && dotBFloat.x < 0.0f)
+                    {
+                        float tout = 0.0f;
+                        edge.IntersectPlane(plane, tout);
+
+                        __m128 t = _mm_set1_ps(tout);
+
+                        __m128 vertPos = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), posA), _mm_mul_ps(t, posB));
+                        __m128 vertNor = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), norA), _mm_mul_ps(t, norB));
+                        __m128 vertTan = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), tanA), _mm_mul_ps(t, tanB));
+                        __m128 vertTex = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), texA), _mm_mul_ps(t, texB));
+
+                        Vertex vertex;
+                        vertex.Position.x = M(vertPos, 0);
+                        vertex.Position.y = M(vertPos, 1);
+                        vertex.Position.z = M(vertPos, 2);
+                        vertex.Normal.x = M(vertNor, 0);
+                        vertex.Normal.y = M(vertNor, 1);
+                        vertex.Normal.z = M(vertNor, 2);
+                        vertex.TangentU.x = M(vertTan, 0);
+                        vertex.TangentU.y = M(vertTan, 1);
+                        vertex.TangentU.z = M(vertTan, 2);
+                        vertex.TexC.x = M(vertTex, 0);
+                        vertex.TexC.y = M(vertTex, 1);
+
+                        newIndices[newIncicesCount++] = result->Vertices.size();
+                        result->Vertices.push_back(vertex);
+                    }
+                    else if (dotAFloat.x < 0.0f && dotBFloat.x >= 0.0f)
+                    {
+                        float tout = 0.0f;
+                        edge.IntersectPlane(plane, tout);
+
+                        __m128 t = _mm_set1_ps(tout);
+
+                        __m128 vertPos = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), posA), _mm_mul_ps(t, posB));
+                        __m128 vertNor = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), norA), _mm_mul_ps(t, norB));
+                        __m128 vertTan = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), tanA), _mm_mul_ps(t, tanB));
+                        __m128 vertTex = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(one, t), texA), _mm_mul_ps(t, texB));
+
+                        Vertex vertex;
+                        vertex.Position.x = M(vertPos, 0);
+                        vertex.Position.y = M(vertPos, 1);
+                        vertex.Position.z = M(vertPos, 2);
+                        vertex.Normal.x = M(vertNor, 0);
+                        vertex.Normal.y = M(vertNor, 1);
+                        vertex.Normal.z = M(vertNor, 2);
+                        vertex.TangentU.x = M(vertTan, 0);
+                        vertex.TangentU.y = M(vertTan, 1);
+                        vertex.TangentU.z = M(vertTan, 2);
+                        vertex.TexC.x = M(vertTex, 0);
+                        vertex.TexC.y = M(vertTex, 1);
+
+                        newIndices[newIncicesCount++] = result->Vertices.size();
+                        newIndices[newIncicesCount++]  = indexB;
+                        result->Vertices.push_back(vertex);
+                    }
+
+                    vertexIndex += 2;
+
+                }
+
+                // now we have the clip rectangle
+                // but we need to triagulize this becouse its not a triangle any more
+                USHORT triagulazedIndices[6];
+                UINT triagulazedIndicesCount = 0;
+                if (newIncicesCount == 4)
+                {
+                    triagulazedIndices[0] = newIndices[0];
+                    triagulazedIndices[1] = newIndices[1];
+                    triagulazedIndices[2] = newIndices[2];
+                    triagulazedIndices[3] = newIndices[0];
+                    triagulazedIndices[4] = newIndices[2];
+                    triagulazedIndices[5] = newIndices[3];
+                    triagulazedIndicesCount = 6;
+                }
+                else
+                {
+                    triagulazedIndices[0] = newIndices[0];
+                    triagulazedIndices[1] = newIndices[1];
+                    triagulazedIndices[2] = newIndices[2];
+                    triagulazedIndicesCount = newIncicesCount;
+                }
+
+                for (int index = 0; index < triagulazedIndicesCount; ++index)
+                {
+                    indices[indicesCount + index] = triagulazedIndices[index];
+                }
+                indicesCount += triagulazedIndicesCount;
+
+                
+
+            }
+            subset.IndexStart = indexStart;
+            subset.IndexCount = indicesCount - subset.IndexStart;
+            newSubsets[j] = subset;
+        }
+
+        if (indicesCount == 0)
+        {
+            free(newSubsets);
+            free(indices);
+            delete result;
+            return nullptr;
+        }
+
+        std::vector<USHORT> finalIndices(indices, indices + indicesCount);
+        std::vector<MeshGeometry::Subset> finalSubset(newSubsets, newSubsets + subsetCount);
+
+        result->ModelMesh.SetVertices(device, result->Vertices.data(), result->Vertices.size());
+        result->ModelMesh.SetIndices(device, indices, indicesCount);
+        result->ModelMesh.SetSubsetTable(finalSubset);
+        result->Indices = finalIndices;
+
+        free(newSubsets);
+        free(indices);
+
+        return result;
+    }
+
+#else
     Mesh* Mesh::Clip(ID3D11Device* device, Plane& plane)
     {
         // TODO: not create a IndexBuffer when it its nothing to draw
@@ -413,7 +653,7 @@ namespace Ruby
                     Indices[i + 1], Indices[i + 2],
                     Indices[i + 2], Indices[i + 0]
                 };
-                
+
                 UINT vertexIndex = 0;
 
                 std::vector<USHORT> newIndices;
@@ -421,7 +661,7 @@ namespace Ruby
                 for (int edgeIndex = 0; edgeIndex < 3; ++edgeIndex)
                 {
                     Line edge = edges[edgeIndex];
-                    
+
                     XMVECTOR A = XMVectorSet(edge.a.x, edge.a.y, edge.a.z, 1.0f);
                     XMVECTOR B = XMVectorSet(edge.b.x, edge.b.y, edge.b.z, 1.0f);
 
@@ -510,6 +750,11 @@ namespace Ruby
         result->Indices = indices;
         return result;
     }
+
+
+#endif
+
+
 
     void Mesh::GetBoundingBox(XMFLOAT3& min, XMFLOAT3& max)
     {

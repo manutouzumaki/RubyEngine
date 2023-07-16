@@ -54,10 +54,12 @@ namespace Ruby
     {
         return mInstance;
     }
+
     HWND App::Window()
     {
         return mWindow;
     }
+
     float App::AspectRatio()
     {
         return (float)mClientWidth / (float)mClientHeight;
@@ -194,11 +196,16 @@ namespace Ruby
     {
         if (!InitMainWindow())
             return false;
+
         if (!InitDirect3D())
             return false;
 
+        ShowWindow(mWindow, SW_SHOW);
+        UpdateWindow(mWindow);
+
         return true;
     }
+
     void App::OnResize()
     {
         assert(mImmediateContext);
@@ -254,6 +261,7 @@ namespace Ruby
         mImmediateContext->RSSetViewports(1, &mViewport);
 
     }
+
     LRESULT App::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
         switch (msg)
@@ -347,49 +355,13 @@ namespace Ruby
             ((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
             ((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
             return 0;
-/*
-        case WM_LBUTTONDOWN:
-        case WM_MBUTTONDOWN:
-        case WM_RBUTTONDOWN:
-            OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-            return 0;
-        case WM_LBUTTONUP:
-        case WM_MBUTTONUP:
-        case WM_RBUTTONUP:
-            OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-            return 0;
-        case WM_MOUSEMOVE:
-            OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-            return 0;
-
-        case WM_KEYDOWN:
-        case WM_SYSKEYDOWN:
-        {
-            bool wasDown = ((lParam & (1 << 30)) != 0);
-            bool isDown = ((lParam & (1 << 31)) == 0);
-            if (isDown != wasDown) OnKeyDown(wParam);
-            return 0;
-        }
-        case WM_KEYUP:
-        case WM_SYSKEYUP:
-        {
-            bool wasDown = ((lParam & (1 << 30)) != 0);
-            bool isDown = ((lParam & (1 << 31)) == 0);
-            if (isDown != wasDown) OnKeyUp(wParam);
-            return 0;
-        }
-        */
         case WM_MOVE:
         {
             mWindowX = (UINT)(short)LOWORD(lParam);
             mWindowY = (UINT)(short)HIWORD(lParam);
             return 0;
         }
-        
-
         }
-
-
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
@@ -430,12 +402,10 @@ namespace Ruby
             return false;
         }
 
-        ShowWindow(mWindow, SW_SHOW);
-        UpdateWindow(mWindow);
-
         return true;
 
     }
+
     bool App::InitDirect3D()
     {
         UINT createDeviceFlags = 0;
@@ -506,6 +476,8 @@ namespace Ruby
         // also need to be executed every time the window is resized.  So
         // just call the OnResize method here to avoid code duplication.
         OnResize();
+
+        return true;
 
     }
 
