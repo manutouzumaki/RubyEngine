@@ -34,6 +34,7 @@ FPSDemo::FPSDemo(HINSTANCE instance,
     DirectX::XMStoreFloat4x4(&mProj, identity);
 }
 
+
 FPSDemo::~FPSDemo()
 {
     SAFE_DELETE(mCamera);
@@ -87,6 +88,140 @@ static const int gNrRows = 7;
 static const int gNrCols = 7;
 static const float gSpacing = 1.2f;
 
+static HANDLE gSemaphoreHandle;
+static WorkQueue gQueue;
+
+// TODO: make a nice class for this and improve it ....
+
+#define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;}
+
+
+// TODO try to create a general WorkQueue ...
+void AddEntry(SplitGeometryEntry* data)
+{
+    UINT32 newNextEntryToWrite = (gQueue.nextEntryToWrite + 1) % RUBY_MAX_ENTRY_COUNT;
+    Assert(newNextEntryToWrite != gQueue.nextEntryToRead);
+    gQueue.entries[gQueue.nextEntryToWrite] = *data;
+    ++gQueue.completitionGoal;
+    _WriteBarrier();
+    gQueue.nextEntryToWrite = newNextEntryToWrite;
+    //ReleaseSemaphore(gSemaphoreHandle, 1, 0);
+}
+
+bool DoNextWorkQueueEntry(int threadIndex)
+{
+    // TODO: we probably dont need this sleep
+    bool shouldSleep = false;
+
+    UINT32 originalNextEntryToRead = gQueue.nextEntryToRead;
+    UINT32 newNextEntryToRead = (originalNextEntryToRead + 1) % RUBY_MAX_ENTRY_COUNT;
+    if (originalNextEntryToRead != gQueue.nextEntryToWrite)
+    {
+        UINT32 index = InterlockedCompareExchange(
+            (LONG volatile*)&gQueue.nextEntryToRead,
+            newNextEntryToRead,
+            originalNextEntryToRead);
+
+        if (index == originalNextEntryToRead)
+        {
+            SplitGeometryEntry *work = gQueue.entries + index;
+#if 1
+            // TODO: process entry
+            float halfWidth = work->halfWidth;
+            XMFLOAT3 center = work->center;
+
+            Ruby::Plane faces[6] = {
+
+                {XMFLOAT3(1, 0,   0), center.x - halfWidth},
+                {XMFLOAT3(-1,  0,  0), -center.x - halfWidth},
+                {XMFLOAT3(0, 1,   0), center.y - halfWidth},
+                {XMFLOAT3(0, -1,  0), -center.y - halfWidth},
+                {XMFLOAT3(0, 0,   1), center.z - halfWidth},
+                {XMFLOAT3(0, 0,  -1), -center.z - halfWidth},
+
+            };
+
+            Ruby::Mesh* mesh = work->pThis->mBaseMesh;
+
+            for (int i = 0; i < 6; ++i)
+            {
+                Ruby::Mesh* tmp = nullptr;
+                if (i > 0) tmp = mesh;
+                mesh = mesh->Clip(work->pThis->mDevice, faces[i]);
+                SAFE_DELETE(tmp);
+                if (mesh == nullptr)
+                {
+                    break;
+                }
+            }
+
+            if (mesh != nullptr)
+            {
+                // TODO: when get this working try to remove the std vector to see if that improve the speed
+                work->pThis->mPerThreadMeshes[threadIndex].vector.push_back(mesh);
+            }
+#endif
+            InterlockedIncrement((LONG volatile*)&gQueue.completitionCount);
+        }
+
+    }
+    else
+    {
+        shouldSleep = true;
+    }
+
+    return shouldSleep;
+}
+
+void CompleteAllWork()
+{
+    while (gQueue.completitionGoal != gQueue.completitionCount)
+    {
+        DoNextWorkQueueEntry(0);
+    }
+
+    gQueue.completitionGoal = 0;
+    gQueue.completitionCount = 0;
+}
+
+// TODO: try to implement a simpel version then try to do a WorkQueue ...
+DWORD WINAPI ThreadProc(LPVOID lpParameter)
+{
+    for (;;)
+    {
+        ThreadInfo* threadInfo = (ThreadInfo*)lpParameter;
+
+        if (DoNextWorkQueueEntry(threadInfo->threadIndex));
+        {
+            //WaitForSingleObjectEx(gSemaphoreHandle, INFINITE, FALSE);
+        }
+    }
+    //return 0;
+}
+
+// SplitGeometry multithreaded
+void FPSDemo::SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node)
+{
+    if (node->pChild[0] == nullptr)
+    {
+        SplitGeometryEntry data;
+        data.halfWidth = node->halfWidth;
+        data.center = node->center;
+        data.pThis = this;
+        AddEntry(&data);
+    }
+    else
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            SplitGeometryFast(node->pChild[i]);
+        }
+    }
+}
+
+
+// SplitGeometry single threaded
+#if 1
 void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
     Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
     Ruby::Mesh* fullMesh)
@@ -97,6 +232,9 @@ void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
 
         // we should clip the geometry to the 6 cube faces form by the center and the halfWidht
 
+        // Here we should do the PushWork to the WorkQueue ...
+
+        // This is the work we need to send ...
         Ruby::Plane faces[6] = {
 
             {XMFLOAT3(1, 0,   0), node->center.x - halfWidth},
@@ -126,7 +264,6 @@ void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
             ++mMeshCount;
             assert(mMeshCount < 1000);
         }
-
     }
     else
     {
@@ -138,14 +275,27 @@ void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
 
 
 }
+#endif
 
 bool FPSDemo::Init()
 {
     if (!Ruby::App::Init())
         return false;
 
-    DebugProfilerBegin(Init);
+    gSemaphoreHandle = CreateSemaphoreEx(0, 0, RUBY_MAX_THREAD_COUNT,
+                                         0, 0, SEMAPHORE_ALL_ACCESS);
 
+    HANDLE threadIds[RUBY_MAX_THREAD_COUNT];
+
+    for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
+    {
+        
+        mThreadInfo[i].threadIndex = i + 1;
+        DWORD threadId;
+        threadIds[i] = CreateThread(0, 0, ThreadProc, &mThreadInfo[i], 0, &threadId);
+    }
+
+    DebugProfilerBegin(Init);
 
     D3D11_RASTERIZER_DESC fillRasterizerNoneDesc = {};
     fillRasterizerNoneDesc.FillMode = D3D11_FILL_SOLID;
@@ -159,6 +309,7 @@ bool FPSDemo::Init()
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
     mMesh[999] = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
+    mBaseMesh = mMesh[999];
 
     XMFLOAT3 min, max;
     mMesh[999]->GetBoundingBox(min, max);
@@ -174,6 +325,18 @@ bool FPSDemo::Init()
     // TODO: try to split the level geometry using the octree as division planes
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
+
+    
+    DebugProfilerBegin(SplitGeometryFast);
+    SplitGeometryFast(octree->mRoot);
+    CompleteAllWork();
+    DebugProfilerEnd(SplitGeometryFast);
+
+    // kills the threads
+    for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
+    {
+        TerminateThread(threadIds[i], 0);
+    }
 
     DebugProfilerBegin(SplitGeometry);
 
@@ -191,8 +354,8 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        //float* data = stbi_loadf("./assets/sandsloot_2k.hdr", &width, &height, &nrComponents, 0);
-        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        // float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D

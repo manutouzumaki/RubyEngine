@@ -46,6 +46,8 @@ namespace Ruby
         virtual void OnKeyDown(WPARAM vkCode) { }
         virtual void OnKeyUp(WPARAM vkCode) { }
 
+        ID3D11Device* mDevice;
+
     protected:
         bool InitMainWindow();
         bool InitDirect3D();
@@ -63,7 +65,6 @@ namespace Ruby
         Timer mTimer;
         Input mInput;
 
-        ID3D11Device* mDevice;
         ID3D11DeviceContext* mImmediateContext; // this is for single threading, try the deferred contex for multithreading
         IDXGISwapChain* mSwapChain;
         ID3D11Texture2D* mDepthStencilBuffer;

@@ -8,6 +8,45 @@
 #include "../RubyScene.h"
 #include "../RubyCamera.h"
 
+// this is for 64 bytes alignment that is needed for cache lines alignment
+// to be use in different threads
+
+#define RUBY_MAX_THREAD_COUNT 7
+#define RUBY_MAX_ENTRY_COUNT 512
+
+class FPSDemo;
+
+struct MeshVectorWithPad
+{
+    std::vector<Ruby::Mesh*> vector;
+    char pad[32];
+};
+
+struct SplitGeometryEntry
+{
+    float halfWidth;
+    XMFLOAT3 center;
+    FPSDemo* pThis;
+};
+
+struct WorkQueue
+{
+    UINT32 volatile completitionGoal;
+    UINT32 volatile completitionCount;
+
+    UINT32 volatile nextEntryToWrite;
+    UINT32 volatile nextEntryToRead;
+
+    SplitGeometryEntry entries[RUBY_MAX_ENTRY_COUNT];
+
+};
+
+struct ThreadInfo
+{
+    DWORD threadIndex;
+};
+
+
 class FPSDemo : public Ruby::App
 {
 public:
@@ -28,6 +67,15 @@ public:
     void SplitGeometry(Ruby::Mesh* mesh,
         Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
         Ruby::Mesh* fullMesh);
+
+    void SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node);
+
+    Ruby::Mesh* mBaseMesh;
+    Ruby::Mesh** mSubmeshes;
+    UINT mSubmeshCount;
+    MeshVectorWithPad mPerThreadMeshes[RUBY_MAX_THREAD_COUNT + 1];
+    ThreadInfo mThreadInfo[RUBY_MAX_THREAD_COUNT];
+
 
 
 private:
@@ -116,5 +164,4 @@ private:
     Ruby::Scene* mScene;
 
     Ruby::FPSCamera* mCamera;
-
 };
