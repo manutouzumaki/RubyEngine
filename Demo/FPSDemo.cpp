@@ -88,7 +88,6 @@ static const int gNrRows = 7;
 static const int gNrCols = 7;
 static const float gSpacing = 1.2f;
 
-static HANDLE gSemaphoreHandle;
 static WorkQueue gQueue;
 
 // TODO: make a nice class for this and improve it ....
@@ -105,14 +104,10 @@ void AddEntry(SplitGeometryEntry* data)
     ++gQueue.completitionGoal;
     _WriteBarrier();
     gQueue.nextEntryToWrite = newNextEntryToWrite;
-    //ReleaseSemaphore(gSemaphoreHandle, 1, 0);
 }
 
-bool DoNextWorkQueueEntry(int threadIndex)
+void DoNextWorkQueueEntry(int threadIndex)
 {
-    // TODO: we probably dont need this sleep
-    bool shouldSleep = false;
-
     UINT32 originalNextEntryToRead = gQueue.nextEntryToRead;
     UINT32 newNextEntryToRead = (originalNextEntryToRead + 1) % RUBY_MAX_ENTRY_COUNT;
     if (originalNextEntryToRead != gQueue.nextEntryToWrite)
@@ -125,8 +120,7 @@ bool DoNextWorkQueueEntry(int threadIndex)
         if (index == originalNextEntryToRead)
         {
             SplitGeometryEntry *work = gQueue.entries + index;
-#if 1
-            // TODO: process entry
+
             float halfWidth = work->halfWidth;
             XMFLOAT3 center = work->center;
 
@@ -159,25 +153,20 @@ bool DoNextWorkQueueEntry(int threadIndex)
             {
                 // TODO: when get this working try to remove the std vector to see if that improve the speed
                 work->pThis->mPerThreadMeshes[threadIndex].vector.push_back(mesh);
+                work->pNode->pObjList.push_back(mesh);
             }
-#endif
+
             InterlockedIncrement((LONG volatile*)&gQueue.completitionCount);
         }
 
     }
-    else
-    {
-        shouldSleep = true;
-    }
-
-    return shouldSleep;
 }
 
 void CompleteAllWork()
 {
     while (gQueue.completitionGoal != gQueue.completitionCount)
     {
-        DoNextWorkQueueEntry(0);
+        DoNextWorkQueueEntry(RUBY_MAX_THREAD_COUNT);
     }
 
     gQueue.completitionGoal = 0;
@@ -190,13 +179,9 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
     for (;;)
     {
         ThreadInfo* threadInfo = (ThreadInfo*)lpParameter;
-
-        if (DoNextWorkQueueEntry(threadInfo->threadIndex));
-        {
-            //WaitForSingleObjectEx(gSemaphoreHandle, INFINITE, FALSE);
-        }
+        DoNextWorkQueueEntry(threadInfo->threadIndex);
     }
-    //return 0;
+
 }
 
 // SplitGeometry multithreaded
@@ -208,6 +193,7 @@ void FPSDemo::SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node)
         data.halfWidth = node->halfWidth;
         data.center = node->center;
         data.pThis = this;
+        data.pNode = node;
         AddEntry(&data);
     }
     else
@@ -282,15 +268,10 @@ bool FPSDemo::Init()
     if (!Ruby::App::Init())
         return false;
 
-    gSemaphoreHandle = CreateSemaphoreEx(0, 0, RUBY_MAX_THREAD_COUNT,
-                                         0, 0, SEMAPHORE_ALL_ACCESS);
-
     HANDLE threadIds[RUBY_MAX_THREAD_COUNT];
-
     for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
     {
-        
-        mThreadInfo[i].threadIndex = i + 1;
+        mThreadInfo[i].threadIndex = i;
         DWORD threadId;
         threadIds[i] = CreateThread(0, 0, ThreadProc, &mThreadInfo[i], 0, &threadId);
     }
@@ -317,45 +298,48 @@ bool FPSDemo::Init()
     float meshWidth = max.x - min.x;
     float meshDepth = max.z - min.z;
 
-    float centerZ = 0;
-    float centerX = 0;
+    float centerX = 0.008616f;
+    float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(0.008616f, 0.0f, -0.024896f), meshDepth * 0.5f, 3);
-
-    // TODO: try to split the level geometry using the octree as division planes
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
-
     
     DebugProfilerBegin(SplitGeometryFast);
     SplitGeometryFast(octree->mRoot);
     CompleteAllWork();
-    DebugProfilerEnd(SplitGeometryFast);
 
     // kills the threads
     for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
     {
         TerminateThread(threadIds[i], 0);
+        CloseHandle(threadIds[i]);
     }
 
-    DebugProfilerBegin(SplitGeometry);
+    for (int i = 0; i < 8; ++i)
+    {
+        for (int meshIndex = 0; meshIndex < mPerThreadMeshes[i].vector.size(); ++meshIndex)
+        {
+            mMesh[mMeshCount++] = mPerThreadMeshes[i].vector[meshIndex];
+        }
+    }
+    DebugProfilerEnd(SplitGeometryFast);
 
+    // Old slow SplitGeometry function
+    //DebugProfilerBegin(SplitGeometry);
     // go to the deepest level to and split the geometry
+    //SplitGeometry(mMesh[999], octree->mRoot, mMesh[999]);
+    //DebugProfilerEnd(SplitGeometry);
 
-    SplitGeometry(mMesh[999], octree->mRoot, mMesh[999]);
-
-
-    DebugProfilerEnd(SplitGeometry);
-
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 10, -40), XMFLOAT3(0, 0, 0), 4.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 4.0f);
 
     DebugProfilerBegin(HDRTexture);
     // Load HDR Texture
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        // float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -556,6 +540,7 @@ bool FPSDemo::Init()
         mHdrTechnique = mHdrEffect->GetTechniqueByName("HdrTech");
         mHdrBackBuffer = mHdrEffect->GetVariableByName("gBackBuffer")->AsShaderResource();
         mBloomBuffer = mHdrEffect->GetVariableByName("gBloomBuffer")->AsShaderResource();
+        mHdrTimer = mHdrEffect->GetVariableByName("gTimer");
     }
     // Create Blur Effect
     {
@@ -1036,7 +1021,6 @@ void FPSDemo::UpdateScene()
         timer = 0.0f;
     }
     mSkyTimer->SetRawValue(&timer, 0, sizeof(float));
-
 #if 0
     char buffer[256];
     wsprintf(buffer, "FPS: %d\n", (DWORD)(1.0f / dt));
@@ -1050,6 +1034,10 @@ void FPSDemo::DrawScene()
 {
     mImmediateContext->IASetInputLayout(mInputLayout);
     mImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Query the octree
+    std::vector<Ruby::OctreeNode<Ruby::SceneStaticObject>*> queryResult;
+    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(8, 8, 8), queryResult);
 
     mShadowMap->BindDsvAndSetNullRenderTarget(mImmediateContext);
 
@@ -1078,11 +1066,11 @@ void FPSDemo::DrawScene()
                 count = 0.0f;
             }
 
-            for (int index = 0; index < mMeshCount; ++index)
+            for (int index = 0; index < queryResult.size(); ++index)
             {
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
                 mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                Ruby::Mesh* mesh = mMesh[index];
+                Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
                     mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
@@ -1114,13 +1102,7 @@ void FPSDemo::DrawScene()
         mTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            static float count = 0.0f;
-            count += 0.1f;
-            if (count >= (float)mMeshCount + 1)
-            {
-                count = 0.0f;
-            }
-            for (int index = 0; index < mMeshCount; ++index)
+            for (int index = 0; index < queryResult.size(); ++index)
             {
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
                 XMMATRIX worldInvTranspose = InverseTranspose(world);
@@ -1128,7 +1110,7 @@ void FPSDemo::DrawScene()
                 mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
                 mFxWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
                 mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
-                Ruby::Mesh* mesh = mMesh[index];
+                Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
                     mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
@@ -1190,8 +1172,9 @@ void FPSDemo::DrawScene()
             mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
         }
     }
-
-
+    static float timer = 0.0f;
+    mHdrTimer->SetRawValue(&timer, 0, sizeof(float));
+    timer += mTimer.DeltaTime();
     mHdrBackBuffer->SetResource(mFrameBuffers[0]->GetShaderResourceView());
     mBloomBuffer->SetResource(mPinPongFrameBuffers[1]->GetShaderResourceView());
     // Final render to quad2d

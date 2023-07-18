@@ -27,6 +27,7 @@ struct SplitGeometryEntry
     float halfWidth;
     XMFLOAT3 center;
     FPSDemo* pThis;
+    Ruby::OctreeNode<Ruby::SceneStaticObject>* pNode;
 };
 
 struct WorkQueue
@@ -71,12 +72,8 @@ public:
     void SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node);
 
     Ruby::Mesh* mBaseMesh;
-    Ruby::Mesh** mSubmeshes;
-    UINT mSubmeshCount;
     MeshVectorWithPad mPerThreadMeshes[RUBY_MAX_THREAD_COUNT + 1];
     ThreadInfo mThreadInfo[RUBY_MAX_THREAD_COUNT];
-
-
 
 private:
 
@@ -125,6 +122,8 @@ private:
     ID3DX11EffectTechnique* mHdrTechnique;
     ID3DX11EffectShaderResourceVariable* mHdrBackBuffer;
     ID3DX11EffectShaderResourceVariable* mBloomBuffer;
+    ID3DX11EffectVariable* mHdrTimer;
+
 
     ID3DX11Effect* mBlurEffect;
     ID3DX11EffectTechnique* mBlurTechnique;

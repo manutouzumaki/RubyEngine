@@ -25,6 +25,11 @@ struct VertexOut
     float2 Uvs   : TEXCOORD0;
 };
 
+cbuffer cpPerObject
+{
+    float gTimer;
+};
+
 Texture2D gBackBuffer;
 Texture2D gBloomBuffer;
 
@@ -56,29 +61,27 @@ VertexOut VS(VertexIn vin, uint vertID : SV_VertexID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    // this is for 4xmsaa enable
+
+
+    // Ripples     
     /*
-    float4 color = float4(0, 0, 0, 1.0f);
-    uint width = 0;
-    uint height = 0;
-    uint sampleCount = 0;
-    gBackBuffer.GetDimensions(width, height, sampleCount);
-
-    for (uint i = 0; i < sampleCount; i++)
-    {
-        int2 coords = int2(pin.Uvs * float2(width, height));
-        color += gBackBuffer.Load(coords, i);
-    }
-
-    color /= sampleCount;
+    float distCenter = length(pin.Uvs - 0.5f);
+    float d = sin(distCenter * 50.0f - gTimer * 4.0f);
+    float2 dir = normalize(pin.Uvs - 0.5f);
+    float2 rippleCoords = pin.Uvs + d * dir * 0.01f;
+    
+    // Pixelation
+    float2 dims = float2(64.0, 64.0);
+    float2 coord = floor(rippleCoords * dims) / dims;
     */
-
+    float2 coord = pin.Uvs;
+    
     // this is for 4xmsaa disable
-    float4 color = gBackBuffer.Sample(samPoint, pin.Uvs);
-    float4 bloom = gBloomBuffer.Sample(samLinear, pin.Uvs);
+    float4 color = gBackBuffer.Sample(samPoint, coord);
+    float4 bloom = gBloomBuffer.Sample(samLinear, coord);
 
     color += bloom;
-
+    
     // HDR
     float3 hdrColor = color.rgb;
 
@@ -92,7 +95,8 @@ float4 PS(VertexOut pin) : SV_Target
     // gama correction
     float invgamma = 1.0f / 2.2;
     mapped = pow(abs(mapped), invgamma.xxx);
-
+    
+    
     return float4(mapped, 1.0f);
 }
 

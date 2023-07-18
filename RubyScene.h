@@ -3,6 +3,15 @@
 
 namespace Ruby
 {
+    struct AABB
+    {
+        XMFLOAT3 c;
+        XMFLOAT3 r;
+
+    };
+
+    int TestAABBAABB(AABB& a, AABB& b);
+
     class SceneStaticObject
     {
     private:
@@ -20,13 +29,42 @@ namespace Ruby
     template<typename Type>
     struct OctreeNode
     {
+
+        void Query(XMFLOAT3 c, XMFLOAT3 r, std::vector<OctreeNode<Type>*>& result);
+
+
         ~OctreeNode();
 
         XMFLOAT3 center;
         float halfWidth;
-        OctreeNode* pChild[8];
-        Type* pObjList;
+        OctreeNode<Type>* pChild[8];
+        std::vector<Mesh*> pObjList;
     };
+
+    template<typename T>
+    void OctreeNode<T>::Query(XMFLOAT3 c, XMFLOAT3 r, std::vector<OctreeNode<T>*>& result)
+    {
+        AABB a = { c, r };
+        AABB b = { center, XMFLOAT3(halfWidth, halfWidth, halfWidth) };
+        if (TestAABBAABB(a, b))
+        {
+            if (pChild[0] == nullptr)
+            {
+                if (pObjList.empty() == false)
+                {
+                    result.push_back(this);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 8; ++i)
+                {
+                    pChild[i]->Query(c, r, result);
+                }
+            }
+        }
+
+    }
 
     template<typename T>
     OctreeNode<T>::~OctreeNode()
@@ -51,7 +89,6 @@ namespace Ruby
             OctreeNode<T>* pNode = new OctreeNode<T>;
             pNode->center = center;
             pNode->halfWidth = halfWidth;
-            pNode->pObjList = nullptr;
 
             // Recursively construct the eight children of the subtree
             XMFLOAT3 offset;

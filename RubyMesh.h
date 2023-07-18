@@ -75,15 +75,11 @@ namespace Ruby
         ~Mesh();
 
         Mesh* Clip(ID3D11Device* device, Plane& plane);
-
         void GetBoundingBox(XMFLOAT3& min, XMFLOAT3& max);
 
         std::vector<Pbr::Material> Mat;
-
         std::vector<Vertex> Vertices;
         std::vector<USHORT> Indices;
-        std::vector<MeshGeometry::Subset> Subsets;
-
         MeshGeometry ModelMesh;
     };
 }
