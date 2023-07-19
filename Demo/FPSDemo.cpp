@@ -22,9 +22,6 @@ FPSDemo::FPSDemo(HINSTANCE instance,
     const char* windowCaption,
     bool enable4xMsaa)
     : Ruby::App(instance, clientWidth, clientHeight, windowCaption, enable4xMsaa),
-    mEffect(nullptr),
-    mTechnique(nullptr),
-    mFxWorldViewProj(nullptr),
     mInputLayout(nullptr),
     mMesh()
 {
@@ -56,16 +53,16 @@ FPSDemo::~FPSDemo()
     SAFE_RELEASE(mHdrSkyTexture2D);
     SAFE_RELEASE(mHdrSkySRV);
 
-    SAFE_RELEASE(mBrdfEffect);
-    SAFE_RELEASE(mSkyEffect);
-    SAFE_RELEASE(mConvoluteEffect);
-    SAFE_RELEASE(mCubemapEffect);
-    SAFE_RELEASE(mEffect);
-    SAFE_RELEASE(mDepthEffect);
-    SAFE_RELEASE(mHdrEffect);
-    SAFE_RELEASE(mBlurEffect);
-    SAFE_RELEASE(mInputLayout);
+    SAFE_DELETE(mBaseEffect);
+    SAFE_DELETE(mDepthEffect);
+    SAFE_DELETE(mHdrEffect);
+    SAFE_DELETE(mBlurEffect);
+    SAFE_DELETE(mCubemapEffect);
+    SAFE_DELETE(mConvoluteEffect);
+    SAFE_DELETE(mSkyEffect);
+    SAFE_DELETE(mBrdfEffect);
 
+    SAFE_RELEASE(mInputLayout);
     SAFE_RELEASE(mRasterizerStateBackCull);
     SAFE_RELEASE(mRasterizerStateFrontCull);
 
@@ -246,266 +243,15 @@ bool FPSDemo::Init()
 
 
     DebugProfilerBegin(Effects);
-    // create the shaders and fx
-    DWORD shaderFlags = 0;
-#if defined( DEBUG ) || defined( _DEBUG )
-    shaderFlags |= D3D10_SHADER_DEBUG;
-#endif
-    shaderFlags |= D3D10_SHADER_SKIP_OPTIMIZATION;
 
-    // Create Color Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/pbrColor.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mTechnique = mEffect->GetTechniqueByName("ColorTech");
-        mFxWorld = mEffect->GetVariableByName("gWorld")->AsMatrix();
-        mFxWorldInvTranspose = mEffect->GetVariableByName("gWorldInvTranspose")->AsMatrix();
-        mFxWorldViewProj = mEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
-        mFxMaterial = mEffect->GetVariableByName("gMaterial");
-        mFxDirLight = mEffect->GetVariableByName("gDirLight");
-        mFxPointLight = mEffect->GetVariableByName("gPointLight");
-        mFxEyePosW = mEffect->GetVariableByName("gEyePosW")->AsVector();
-        mFxLightSpaceMatrix = mEffect->GetVariableByName("gLightSpaceMatrix")->AsMatrix();
-        mFxShadowMap = mEffect->GetVariableByName("gShadowMap")->AsShaderResource();
-        mFxIrradianceMap = mEffect->GetVariableByName("gIrradianceMap")->AsShaderResource();
-        mFxPrefilteredColor = mEffect->GetVariableByName("gPrefilteredColor")->AsShaderResource();
-        mFxBrdfLUT = mEffect->GetVariableByName("gBrdfLUT")->AsShaderResource();
-    }
-    // Create Depth Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/depth.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mDepthEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mDepthTechnique = mDepthEffect->GetTechniqueByName("DepthTech");
-        mDepthFxWorld = mDepthEffect->GetVariableByName("gWorld")->AsMatrix();
-        mDepthFxLightSpaceMatrix = mDepthEffect->GetVariableByName("gLightSpaceMatrix")->AsMatrix();
-        ;
-    }
-    // Create HDR Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/hdr.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mHdrEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mHdrTechnique = mHdrEffect->GetTechniqueByName("HdrTech");
-        mHdrBackBuffer = mHdrEffect->GetVariableByName("gBackBuffer")->AsShaderResource();
-        mBloomBuffer = mHdrEffect->GetVariableByName("gBloomBuffer")->AsShaderResource();
-        mHdrTimer = mHdrEffect->GetVariableByName("gTimer");
-    }
-    // Create Blur Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/blur.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mBlurEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mBlurTechnique = mBlurEffect->GetTechniqueByName("BlurTech");
-        mBlurFxHorizontal = mBlurEffect->GetVariableByName("horizontal");
-        mBlurFxImage = mBlurEffect->GetVariableByName("gImage")->AsShaderResource();
-    }
-    // Create Cubemap Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/cubemap.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mCubemapEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mCubemapTechnique = mCubemapEffect->GetTechniqueByName("CubeMapTech");
-        mCubemapWorldViewProj = mCubemapEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
-        mCubemapRoughness = mCubemapEffect->GetVariableByName("gRoughness");
-        mCubeMap = mCubemapEffect->GetVariableByName("gCubeMap")->AsShaderResource();
-    }
-    // Create Convolute Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/convolute.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mConvoluteEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mConvoluteTechnique = mConvoluteEffect->GetTechniqueByName("ConvoluteTech");
-        mConvoluteWorldViewProj = mConvoluteEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
-        mConvoluteCubeMap = mConvoluteEffect->GetVariableByName("gCubeMap")->AsShaderResource();
-    }
-    // Create Sky Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/sky.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mSkyEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mSkyTechnique = mSkyEffect->GetTechniqueByName("SkyTech");
-        mSkyWorldViewProj = mSkyEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
-        mSkyCubeMap = mSkyEffect->GetVariableByName("gCubeMap")->AsShaderResource();
-        mSkyTimer = mSkyEffect->GetVariableByName("gTimer");
-    }
-    // Create BRDF Effect
-    {
-        ID3D10Blob* compiledShader = 0;
-        ID3D10Blob* compilationMsgs = 0;
-        HRESULT result = D3DX11CompileFromFile("./FX/brdf.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
-
-        if (compilationMsgs != 0)
-        {
-            MessageBox(0, (char*)compilationMsgs->GetBufferPointer(), 0, 0);
-            SAFE_RELEASE(compilationMsgs);
-        }
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: compiling fx ...", 0, 0);
-        }
-
-        result = D3DX11CreateEffectFromMemory(compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), 0, mDevice, &mBrdfEffect);
-
-        if (FAILED(result))
-        {
-            MessageBox(0, "Error: creating fx ...", 0, 0);
-        }
-
-        SAFE_RELEASE(compiledShader);
-
-        mBrdfTechnique = mBrdfEffect->GetTechniqueByName("BrdfTech");
-
-    }
+    mBaseEffect = new Ruby::BaseEffect(mDevice);
+    mDepthEffect = new Ruby::DepthEffect(mDevice);
+    mHdrEffect = new Ruby::HdrEffect(mDevice);
+    mBlurEffect = new Ruby::BlurEffect(mDevice);
+    mCubemapEffect = new Ruby::CubemapEffect(mDevice);
+    mConvoluteEffect = new Ruby::ConvoluteEffect(mDevice);
+    mSkyEffect = new Ruby::SkyEffect(mDevice);
+    mBrdfEffect = new Ruby::BrdfEffect(mDevice);
 
     DebugProfilerEnd(Effects);
 
@@ -519,36 +265,24 @@ bool FPSDemo::Init()
     };
 
     D3DX11_PASS_DESC passDesc;
-    mTechnique->GetPassByIndex(0)->GetDesc(&passDesc);
+    mBaseEffect->GetTechnique()->GetPassByIndex(0)->GetDesc(&passDesc);
     HRESULT result = mDevice->CreateInputLayout(vertexDesc, 4, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mInputLayout);
 
     // set proj matrices
     XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 0.001f, 100.0f);
     DirectX::XMStoreFloat4x4(&mProj, P);
 
-    // Build the view matrix.
-    XMFLOAT3 eyePos = XMFLOAT3(10.0f, 5.0f, -10.0f);
-    //XMFLOAT3 eyePos = XMFLOAT3(0, 0.0f, 6.0f);
-    XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 0.0f);
-    XMVECTOR target = XMVectorZero();
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-    DirectX::XMStoreFloat4x4(&mView, V);
-
-    mFxEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
-
     lightPos = XMVectorSet(0.0f, lightHeight, lightDist, 1.0f);
 
     mDirLight.Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     XMVECTOR lightDir = XMVector3Normalize(lightPos);
     DirectX::XMStoreFloat3(&mDirLight.Direction, lightDir);
-    mFxDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
+    mBaseEffect->mDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
 
     // Point light--position is changed every frame to animate in UpdateScene function.
     mPointLight.Color = XMFLOAT4(100.0f, 100.0f, 100.0f, 1.0f);
     mPointLight.Position = XMFLOAT3(4.0f, 6.0f, -10.0f);
-    mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
+    mBaseEffect->mPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
 
     DebugProfilerBegin(PBRTextures);
@@ -574,8 +308,8 @@ bool FPSDemo::Init()
                 XMMatrixLookAtLH(XMVectorSet(0.0f,  0.0f,  0.0f, 1.0f), XMVectorSet(0.0f,  0.0f, -1.0f, 0.0f), XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f))
             };
 
-            mCubeMap->SetResource(mHdrSkySRV);
-            mConvoluteCubeMap->SetResource(mHdrSkySRV);
+            mCubemapEffect->mCubeMap->SetResource(mHdrSkySRV);
+            mConvoluteEffect->mCubeMap->SetResource(mHdrSkySRV);
 
             mImmediateContext->IASetInputLayout(mInputLayout);
             mImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -600,7 +334,7 @@ bool FPSDemo::Init()
 
 
                     float roughness = (float)mipIndex / (float)(mEnviromentMap->GetMipCount() - 1);
-                    mCubemapRoughness->SetRawValue(&roughness, 0, sizeof(float));
+                    mCubemapEffect->mRoughness->SetRawValue(&roughness, 0, sizeof(float));
 
                     CurrentWidht *= 0.5f;
                     CurrentHeight *= 0.5f;
@@ -617,11 +351,11 @@ bool FPSDemo::Init()
                         XMMATRIX viewProj = captureViews[i] * captureProj;
 
                         D3DX11_TECHNIQUE_DESC techDesc;
-                        mCubemapTechnique->GetDesc(&techDesc);
+                        mCubemapEffect->GetTechnique()->GetDesc(&techDesc);
                         for (UINT p = 0; p < techDesc.Passes; ++p)
                         {
-                            mCubemapWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
-                            mCubemapTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                            mCubemapEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
+                            mCubemapEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                             mSky.Draw(mImmediateContext, 0);
                         }
                     }
@@ -651,11 +385,11 @@ bool FPSDemo::Init()
                     XMMATRIX viewProj = captureViews[i] * captureProj;
 
                     D3DX11_TECHNIQUE_DESC techDesc;
-                    mConvoluteTechnique->GetDesc(&techDesc);
+                    mConvoluteEffect->GetTechnique()->GetDesc(&techDesc);
                     for (UINT p = 0; p < techDesc.Passes; ++p)
                     {
-                        mConvoluteWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
-                        mConvoluteTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                        mConvoluteEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&viewProj));
+                        mConvoluteEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                         mSky.Draw(mImmediateContext, 0);
                     }
                 }
@@ -688,10 +422,10 @@ bool FPSDemo::Init()
             mImmediateContext->ClearRenderTargetView(mBrdfMap->GetRenderTargetView(), (float*)&clearColor);
             {
                 D3DX11_TECHNIQUE_DESC techDesc;
-                mBrdfTechnique->GetDesc(&techDesc);
+                mBrdfEffect->GetTechnique()->GetDesc(&techDesc);
                 for (UINT p = 0; p < techDesc.Passes; ++p)
                 {
-                    mBrdfTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mBrdfEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mImmediateContext->Draw(6, 0);
                 }
             }
@@ -705,11 +439,10 @@ bool FPSDemo::Init()
         }
 
         // Set the cubemap to the shader
-        mFxIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
-        mFxPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
-        mFxBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
-
-        mSkyCubeMap->SetResource(mEnviromentMap->GetShaderResourceView());
+        mBaseEffect->mIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
+        mBaseEffect->mPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
+        mBaseEffect->mBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
+        mSkyEffect->mCubeMap->SetResource(mEnviromentMap->GetShaderResourceView());
     }
 
     mImmediateContext->End(pQuery);
@@ -823,7 +556,7 @@ void FPSDemo::UpdateScene()
 
     XMMATRIX V = mCamera->GetView();
     DirectX::XMStoreFloat4x4(&mView, V);
-    mFxEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
+    mBaseEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
 
     static float timer = 0.0f;
 
@@ -832,7 +565,7 @@ void FPSDemo::UpdateScene()
     {
         timer = 0.0f;
     }
-    mSkyTimer->SetRawValue(&timer, 0, sizeof(float));
+    mSkyEffect->mTimer->SetRawValue(&timer, 0, sizeof(float));
 #if 0
     char buffer[256];
     wsprintf(buffer, "FPS: %d\n", (DWORD)(1.0f / dt));
@@ -864,21 +597,21 @@ void FPSDemo::DrawScene()
         XMMATRIX P = XMMatrixOrthographicOffCenterLH(-20, 20, -20, 20, 0.0001f, 45.0f);
 
         XMMATRIX lightSpaceMatrix = V * P;
-        mDepthFxLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
-        mFxLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
+        mDepthEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
+        mBaseEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
 
         D3DX11_TECHNIQUE_DESC techDesc;
-        mDepthTechnique->GetDesc(&techDesc);
+        mDepthEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
             for (int index = 0; index < queryResult.size(); ++index)
             {
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
-                mDepthFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                mDepthEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
                 Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mDepthTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mDepthEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
@@ -891,7 +624,7 @@ void FPSDemo::DrawScene()
 
     mImmediateContext->RSSetViewports(1, &mViewport);
 
-    mFxShadowMap->SetResource(mShadowMap->mDepthMapSRV);
+    mBaseEffect->mShadowMap->SetResource(mShadowMap->mDepthMapSRV);
 
     XMVECTORF32 clearColor = { 0.0f, 0.0f, 0.001f, 1.0f };
     mImmediateContext->ClearRenderTargetView(mFrameBuffers[0]->GetRenderTargetView(), (float*)&clearColor);
@@ -904,7 +637,7 @@ void FPSDemo::DrawScene()
         // Set constants
         XMMATRIX viewProj = XMLoadFloat4x4(&mView) * XMLoadFloat4x4(&mProj);
         D3DX11_TECHNIQUE_DESC techDesc;
-        mTechnique->GetDesc(&techDesc);
+        mBaseEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
             for (int index = 0; index < queryResult.size(); ++index)
@@ -912,27 +645,27 @@ void FPSDemo::DrawScene()
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
                 XMMATRIX worldInvTranspose = InverseTranspose(world);
                 XMMATRIX worldViewProj = world * viewProj;
-                mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                mFxWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
-                mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+                mBaseEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
+                mBaseEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+                mBaseEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
                 Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mFxMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
-                    mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mBaseEffect->mMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                    mBaseEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
         }
 
-        mSkyTechnique->GetDesc(&techDesc);
+        mSkyEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
             XMFLOAT3 eyePos = mCamera->GetPosition();
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
-            mSkyWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
-            mSkyTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+            mSkyEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+            mSkyEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
             mSky.Draw(mImmediateContext, 0);
         }
     }
@@ -953,18 +686,15 @@ void FPSDemo::DrawScene()
 
             mImmediateContext->OMSetRenderTargets(1, &renderTargets[horizontal], 0);
 
-            mBlurFxHorizontal->SetRawValue(&horizontal, 0, sizeof(bool));
-            mBlurFxImage->SetResource(firstIteration ? mFrameBuffers[1]->GetShaderResourceView() : resourceViews[!horizontal]);
+            mBlurEffect->mHorizontal->SetRawValue(&horizontal, 0, sizeof(bool));
+            mBlurEffect->mImage->SetResource(firstIteration ? mFrameBuffers[1]->GetShaderResourceView() : resourceViews[!horizontal]);
 
             D3DX11_TECHNIQUE_DESC techDesc;
-            mBlurTechnique->GetDesc(&techDesc);
+            mBlurEffect->GetTechnique()->GetDesc(&techDesc);
             for (UINT p = 0; p < techDesc.Passes; ++p)
             {
-
-
-                mBlurTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                mBlurEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                 mImmediateContext->Draw(6, 0);
-
             }
 
             horizontal = !horizontal;
@@ -975,11 +705,12 @@ void FPSDemo::DrawScene()
             mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
         }
     }
+
     static float timer = 0.0f;
-    mHdrTimer->SetRawValue(&timer, 0, sizeof(float));
+    mHdrEffect->mTimer->SetRawValue(&timer, 0, sizeof(float));
     timer += mTimer.DeltaTime();
-    mHdrBackBuffer->SetResource(mFrameBuffers[0]->GetShaderResourceView());
-    mBloomBuffer->SetResource(mPinPongFrameBuffers[1]->GetShaderResourceView());
+    mHdrEffect->mBackBuffer->SetResource(mFrameBuffers[0]->GetShaderResourceView());
+    mHdrEffect->mBloomBuffer->SetResource(mPinPongFrameBuffers[1]->GetShaderResourceView());
     // Final render to quad2d
     {
         ID3D11RenderTargetView* renderTarget[1] = { mRenderTargetView };
@@ -991,10 +722,10 @@ void FPSDemo::DrawScene()
 
         {
             D3DX11_TECHNIQUE_DESC techDesc;
-            mHdrTechnique->GetDesc(&techDesc);
+            mHdrEffect->GetTechnique()->GetDesc(&techDesc);
             for (UINT p = 0; p < techDesc.Passes; ++p)
             {
-                mHdrTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                mHdrEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                 mImmediateContext->Draw(6, 0);
             }
         }

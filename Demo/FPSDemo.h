@@ -8,6 +8,7 @@
 #include "../RubyScene.h"
 #include "../RubyCamera.h"
 #include "../RubyWorkQueue.h"
+#include "../RubyEffect.h"
 
 class FPSDemo : public Ruby::App
 {
@@ -33,58 +34,14 @@ private:
     ID3D11RasterizerState* mRasterizerStateBackCull;
     ID3D11RasterizerState* mRasterizerStateFrontCull;
 
-    ID3DX11Effect* mEffect;
-    ID3DX11EffectTechnique* mTechnique;
-    ID3DX11EffectMatrixVariable* mFxWorld;
-    ID3DX11EffectMatrixVariable* mFxWorldInvTranspose;
-    ID3DX11EffectMatrixVariable* mFxWorldViewProj;
-    ID3DX11EffectVariable* mFxDirLight;
-    ID3DX11EffectVariable* mFxPointLight;
-    ID3DX11EffectVariable* mFxMaterial;
-    ID3DX11EffectVectorVariable* mFxEyePosW;
-    ID3DX11EffectMatrixVariable* mFxLightSpaceMatrix;
-    ID3DX11EffectShaderResourceVariable* mFxShadowMap;
-    ID3DX11EffectShaderResourceVariable* mFxIrradianceMap;
-    ID3DX11EffectShaderResourceVariable* mFxPrefilteredColor;
-    ID3DX11EffectShaderResourceVariable* mFxBrdfLUT;
-
-    ID3DX11Effect* mCubemapEffect;
-    ID3DX11EffectTechnique* mCubemapTechnique;
-    ID3DX11EffectMatrixVariable* mCubemapWorldViewProj;
-    ID3DX11EffectVariable* mCubemapRoughness;
-
-    ID3DX11EffectShaderResourceVariable* mCubeMap;
-
-    ID3DX11Effect* mConvoluteEffect;
-    ID3DX11EffectTechnique* mConvoluteTechnique;
-    ID3DX11EffectMatrixVariable* mConvoluteWorldViewProj;
-    ID3DX11EffectShaderResourceVariable* mConvoluteCubeMap;
-
-    ID3DX11Effect* mSkyEffect;
-    ID3DX11EffectTechnique* mSkyTechnique;
-    ID3DX11EffectMatrixVariable* mSkyWorldViewProj;
-    ID3DX11EffectShaderResourceVariable* mSkyCubeMap;
-    ID3DX11EffectVariable* mSkyTimer;
-
-    ID3DX11Effect* mDepthEffect;
-    ID3DX11EffectTechnique* mDepthTechnique;
-    ID3DX11EffectMatrixVariable* mDepthFxWorld;
-    ID3DX11EffectMatrixVariable* mDepthFxLightSpaceMatrix;
-
-    ID3DX11Effect* mHdrEffect;
-    ID3DX11EffectTechnique* mHdrTechnique;
-    ID3DX11EffectShaderResourceVariable* mHdrBackBuffer;
-    ID3DX11EffectShaderResourceVariable* mBloomBuffer;
-    ID3DX11EffectVariable* mHdrTimer;
-
-
-    ID3DX11Effect* mBlurEffect;
-    ID3DX11EffectTechnique* mBlurTechnique;
-    ID3DX11EffectShaderResourceVariable* mBlurFxImage;
-    ID3DX11EffectVariable* mBlurFxHorizontal;
-
-    ID3DX11Effect* mBrdfEffect;
-    ID3DX11EffectTechnique* mBrdfTechnique;
+    Ruby::BaseEffect* mBaseEffect;
+    Ruby::DepthEffect* mDepthEffect;
+    Ruby::HdrEffect* mHdrEffect;
+    Ruby::BlurEffect* mBlurEffect;
+    Ruby::CubemapEffect* mCubemapEffect;
+    Ruby::ConvoluteEffect* mConvoluteEffect;
+    Ruby::SkyEffect* mSkyEffect;
+    Ruby::BrdfEffect* mBrdfEffect;
 
     ID3D11InputLayout* mInputLayout;
 

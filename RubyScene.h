@@ -1,6 +1,8 @@
 #pragma once
 #include "RubyMesh.h"
 
+#include "RubyDefines.h"
+
 namespace Ruby
 {
     struct AABB
@@ -69,6 +71,12 @@ namespace Ruby
     template<typename T>
     OctreeNode<T>::~OctreeNode()
     {
+        for (int i = 0; i < pObjList.size(); ++i)
+        {
+            SAFE_DELETE(pObjList[i]);
+        }
+
+
         for (int i = 0; i < 8; ++i)
         {
             if (pChild[i])

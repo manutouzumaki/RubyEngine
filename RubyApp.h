@@ -6,15 +6,12 @@
 #include <DirectXMath.h>
 #include <vector>
 
+#include "RubyDefines.h"
 #include "RubyTimer.h"
 #include "RubyInput.h"
 #include "GeometryGenerator.h"
 
 using namespace DirectX;
-
-#define SAFE_DELETE(x) { if(x) { delete x; x = nullptr; } }
-#define SAFE_DELETE_ARRAY(x) { if(x) { delete[](x);   x = nullptr; } }
-#define SAFE_RELEASE(x) { if(x) { x->Release(); x = nullptr; } }
 
 namespace Ruby
 {

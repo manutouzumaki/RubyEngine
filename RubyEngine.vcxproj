@@ -161,6 +161,7 @@
     <ClCompile Include="RubyApp.cpp" />
     <ClCompile Include="RubyCamera.cpp" />
     <ClCompile Include="RubyDebugProfiler.cpp" />
+    <ClCompile Include="RubyEffect.cpp" />
     <ClCompile Include="RubyInput.cpp" />
     <ClCompile Include="RubyMesh.cpp" />
     <ClCompile Include="RubyScene.cpp" />
@@ -178,6 +179,8 @@
     <ClInclude Include="RubyApp.h" />
     <ClInclude Include="RubyCamera.h" />
     <ClInclude Include="RubyDebugProfiler.h" />
+    <ClInclude Include="RubyDefines.h" />
+    <ClInclude Include="RubyEffect.h" />
     <ClInclude Include="RubyFrameBuffer.h" />
     <ClInclude Include="RubyInput.h" />
     <ClInclude Include="RubyMesh.h" />
