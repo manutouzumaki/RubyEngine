@@ -51,17 +51,11 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mShadowMap);
     SAFE_DELETE(mBrdfMap);
 
-
-    for (int i = 0; i < 1000; ++i)
-    {
-        SAFE_DELETE(mMesh[i]);
-    }
-
+    SAFE_DELETE(mMesh);
 
     SAFE_RELEASE(mHdrSkyTexture2D);
     SAFE_RELEASE(mHdrSkySRV);
 
-    SAFE_RELEASE(mCubeMapSRV);
     SAFE_RELEASE(mBrdfEffect);
     SAFE_RELEASE(mSkyEffect);
     SAFE_RELEASE(mConvoluteEffect);
@@ -84,117 +78,16 @@ static float lightHeight = 4.0f;
 
 #include <algorithm>
 
-static const int gNrRows = 7;
-static const int gNrCols = 7;
-static const float gSpacing = 1.2f;
-
-static WorkQueue gQueue;
-
-// TODO: make a nice class for this and improve it ....
-
-#define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;}
-
-
-// TODO try to create a general WorkQueue ...
-void AddEntry(SplitGeometryEntry* data)
-{
-    UINT32 newNextEntryToWrite = (gQueue.nextEntryToWrite + 1) % RUBY_MAX_ENTRY_COUNT;
-    Assert(newNextEntryToWrite != gQueue.nextEntryToRead);
-    gQueue.entries[gQueue.nextEntryToWrite] = *data;
-    ++gQueue.completitionGoal;
-    _WriteBarrier();
-    gQueue.nextEntryToWrite = newNextEntryToWrite;
-}
-
-void DoNextWorkQueueEntry(int threadIndex)
-{
-    UINT32 originalNextEntryToRead = gQueue.nextEntryToRead;
-    UINT32 newNextEntryToRead = (originalNextEntryToRead + 1) % RUBY_MAX_ENTRY_COUNT;
-    if (originalNextEntryToRead != gQueue.nextEntryToWrite)
-    {
-        UINT32 index = InterlockedCompareExchange(
-            (LONG volatile*)&gQueue.nextEntryToRead,
-            newNextEntryToRead,
-            originalNextEntryToRead);
-
-        if (index == originalNextEntryToRead)
-        {
-            SplitGeometryEntry *work = gQueue.entries + index;
-
-            float halfWidth = work->halfWidth;
-            XMFLOAT3 center = work->center;
-
-            Ruby::Plane faces[6] = {
-
-                {XMFLOAT3(1, 0,   0), center.x - halfWidth},
-                {XMFLOAT3(-1,  0,  0), -center.x - halfWidth},
-                {XMFLOAT3(0, 1,   0), center.y - halfWidth},
-                {XMFLOAT3(0, -1,  0), -center.y - halfWidth},
-                {XMFLOAT3(0, 0,   1), center.z - halfWidth},
-                {XMFLOAT3(0, 0,  -1), -center.z - halfWidth},
-
-            };
-
-            Ruby::Mesh* mesh = work->pThis->mBaseMesh;
-
-            for (int i = 0; i < 6; ++i)
-            {
-                Ruby::Mesh* tmp = nullptr;
-                if (i > 0) tmp = mesh;
-                mesh = mesh->Clip(work->pThis->mDevice, faces[i]);
-                SAFE_DELETE(tmp);
-                if (mesh == nullptr)
-                {
-                    break;
-                }
-            }
-
-            if (mesh != nullptr)
-            {
-                // TODO: when get this working try to remove the std vector to see if that improve the speed
-                work->pThis->mPerThreadMeshes[threadIndex].vector.push_back(mesh);
-                work->pNode->pObjList.push_back(mesh);
-            }
-
-            InterlockedIncrement((LONG volatile*)&gQueue.completitionCount);
-        }
-
-    }
-}
-
-void CompleteAllWork()
-{
-    while (gQueue.completitionGoal != gQueue.completitionCount)
-    {
-        DoNextWorkQueueEntry(RUBY_MAX_THREAD_COUNT);
-    }
-
-    gQueue.completitionGoal = 0;
-    gQueue.completitionCount = 0;
-}
-
-// TODO: try to implement a simpel version then try to do a WorkQueue ...
-DWORD WINAPI ThreadProc(LPVOID lpParameter)
-{
-    for (;;)
-    {
-        ThreadInfo* threadInfo = (ThreadInfo*)lpParameter;
-        DoNextWorkQueueEntry(threadInfo->threadIndex);
-    }
-
-}
-
 // SplitGeometry multithreaded
 void FPSDemo::SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node)
 {
     if (node->pChild[0] == nullptr)
     {
-        SplitGeometryEntry data;
-        data.halfWidth = node->halfWidth;
-        data.center = node->center;
-        data.pThis = this;
+        Ruby::SplitGeometryEntry data;
+        data.mMesh = mMesh;
         data.pNode = node;
-        AddEntry(&data);
+        data.mDevice = mDevice;
+        mQueue.AddEntry(&data);
     }
     else
     {
@@ -205,64 +98,6 @@ void FPSDemo::SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node)
     }
 }
 
-
-// SplitGeometry single threaded
-#if 1
-void FPSDemo::SplitGeometry(Ruby::Mesh* mesh,
-    Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
-    Ruby::Mesh* fullMesh)
-{
-    if (node->pChild[0] == nullptr)
-    {
-        float halfWidth = node->halfWidth;
-
-        // we should clip the geometry to the 6 cube faces form by the center and the halfWidht
-
-        // Here we should do the PushWork to the WorkQueue ...
-
-        // This is the work we need to send ...
-        Ruby::Plane faces[6] = {
-
-            {XMFLOAT3(1, 0,   0), node->center.x - halfWidth},
-            {XMFLOAT3(-1,  0,  0), -node->center.x - halfWidth},
-            {XMFLOAT3(0, 1,   0), node->center.y - halfWidth},
-            {XMFLOAT3(0, -1,  0), -node->center.y - halfWidth},
-            {XMFLOAT3(0, 0,   1), node->center.z - halfWidth},
-            {XMFLOAT3(0, 0,  -1), -node->center.z - halfWidth},
-
-        };
-        mMesh[mMeshCount] = mMesh[999];
-
-        for (int i = 0; i < 6; ++i)
-        {
-            Ruby::Mesh* tmp = nullptr;
-            if (i > 0) tmp = mMesh[mMeshCount];
-            mMesh[mMeshCount] = mMesh[mMeshCount]->Clip(mDevice, faces[i]);
-            SAFE_DELETE(tmp);
-            if (mMesh[mMeshCount] == nullptr)
-            {
-                break;
-            }
-        }
-
-        if (mMesh[mMeshCount] != nullptr)
-        {
-            ++mMeshCount;
-            assert(mMeshCount < 1000);
-        }
-    }
-    else
-    {
-        for (int i = 0; i < 8; ++i)
-        {
-            SplitGeometry(mesh, node->pChild[i], fullMesh);
-        }
-    }
-
-
-}
-#endif
-
 bool FPSDemo::Init()
 {
     if (!Ruby::App::Init())
@@ -271,9 +106,8 @@ bool FPSDemo::Init()
     HANDLE threadIds[RUBY_MAX_THREAD_COUNT];
     for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
     {
-        mThreadInfo[i].threadIndex = i;
         DWORD threadId;
-        threadIds[i] = CreateThread(0, 0, ThreadProc, &mThreadInfo[i], 0, &threadId);
+        threadIds[i] = CreateThread(0, 0, ThreadProc, &mQueue, 0, &threadId);
     }
 
     DebugProfilerBegin(Init);
@@ -289,11 +123,10 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
-    mMesh[999] = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
-    mBaseMesh = mMesh[999];
+    mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
 
     XMFLOAT3 min, max;
-    mMesh[999]->GetBoundingBox(min, max);
+    mMesh->GetBoundingBox(min, max);
 
     float meshWidth = max.x - min.x;
     float meshDepth = max.z - min.z;
@@ -301,13 +134,13 @@ bool FPSDemo::Init()
     float centerX = 0.008616f;
     float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
     
     DebugProfilerBegin(SplitGeometryFast);
     SplitGeometryFast(octree->mRoot);
-    CompleteAllWork();
+    mQueue.CompleteAllWork();
 
     // kills the threads
     for (int i = 0; i < RUBY_MAX_THREAD_COUNT; ++i)
@@ -316,20 +149,8 @@ bool FPSDemo::Init()
         CloseHandle(threadIds[i]);
     }
 
-    for (int i = 0; i < 8; ++i)
-    {
-        for (int meshIndex = 0; meshIndex < mPerThreadMeshes[i].vector.size(); ++meshIndex)
-        {
-            mMesh[mMeshCount++] = mPerThreadMeshes[i].vector[meshIndex];
-        }
-    }
     DebugProfilerEnd(SplitGeometryFast);
 
-    // Old slow SplitGeometry function
-    //DebugProfilerBegin(SplitGeometry);
-    // go to the deepest level to and split the geometry
-    //SplitGeometry(mMesh[999], octree->mRoot, mMesh[999]);
-    //DebugProfilerEnd(SplitGeometry);
 
     mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 4.0f);
 
@@ -388,14 +209,6 @@ bool FPSDemo::Init()
         }
     }
     DebugProfilerEnd(HDRTexture);
-    // Load Cube map
-    {
-        HRESULT result = D3DX11CreateShaderResourceViewFromFileA(mDevice, "./assets/cubemap.dds", 0, 0, &mCubeMapSRV, 0);
-        if (SUCCEEDED(result))
-        {
-            OutputDebugStringA("CubeMap Load succeeded\n");
-        }
-    }
 
     // Load the geometry for the sky (cubemap)
     {
@@ -1002,7 +815,6 @@ void FPSDemo::UpdateScene()
     XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
 
     // Build the view matrix.
-    //XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 50.0f, 20.0f, sinf(angle) * 50.0f);
     XMFLOAT3 eyePos = mCamera->GetPosition();
 
     XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
@@ -1059,13 +871,6 @@ void FPSDemo::DrawScene()
         mDepthTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            static float count = 0.0f;
-            count += 0.1f;
-            if (count >= (float)mMeshCount + 1)
-            {
-                count = 0.0f;
-            }
-
             for (int index = 0; index < queryResult.size(); ++index)
             {
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
@@ -1123,8 +928,6 @@ void FPSDemo::DrawScene()
         mSkyTechnique->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            //XMFLOAT3 eyePos = XMFLOAT3(0.0f, 20.0f, -50.0f);
-            //XMFLOAT3 eyePos = XMFLOAT3(cosf(angle) * 50.0f, 20.0f, sinf(angle) * 50.0f);
             XMFLOAT3 eyePos = mCamera->GetPosition();
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
@@ -1203,6 +1006,6 @@ void FPSDemo::DrawScene()
     ID3D11ShaderResourceView* nullSRV[16] = { 0 };
     mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
 
-    mSwapChain->Present(1, 0);
+    mSwapChain->Present(0, 0);
 
 }

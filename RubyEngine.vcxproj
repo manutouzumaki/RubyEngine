@@ -165,6 +165,7 @@
     <ClCompile Include="RubyMesh.cpp" />
     <ClCompile Include="RubyScene.cpp" />
     <ClCompile Include="RubyTimer.cpp" />
+    <ClCompile Include="RubyWorkQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Demo\FPSDemo.h" />
@@ -182,6 +183,7 @@
     <ClInclude Include="RubyMesh.h" />
     <ClInclude Include="RubyScene.h" />
     <ClInclude Include="RubyTimer.h" />
+    <ClInclude Include="RubyWorkQueue.h" />
     <ClInclude Include="ShadowMap.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

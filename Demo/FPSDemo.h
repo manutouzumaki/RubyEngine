@@ -7,46 +7,7 @@
 #include "../RubyFrameBuffer.h"
 #include "../RubyScene.h"
 #include "../RubyCamera.h"
-
-// this is for 64 bytes alignment that is needed for cache lines alignment
-// to be use in different threads
-
-#define RUBY_MAX_THREAD_COUNT 7
-#define RUBY_MAX_ENTRY_COUNT 512
-
-class FPSDemo;
-
-struct MeshVectorWithPad
-{
-    std::vector<Ruby::Mesh*> vector;
-    char pad[32];
-};
-
-struct SplitGeometryEntry
-{
-    float halfWidth;
-    XMFLOAT3 center;
-    FPSDemo* pThis;
-    Ruby::OctreeNode<Ruby::SceneStaticObject>* pNode;
-};
-
-struct WorkQueue
-{
-    UINT32 volatile completitionGoal;
-    UINT32 volatile completitionCount;
-
-    UINT32 volatile nextEntryToWrite;
-    UINT32 volatile nextEntryToRead;
-
-    SplitGeometryEntry entries[RUBY_MAX_ENTRY_COUNT];
-
-};
-
-struct ThreadInfo
-{
-    DWORD threadIndex;
-};
-
+#include "../RubyWorkQueue.h"
 
 class FPSDemo : public Ruby::App
 {
@@ -65,15 +26,7 @@ public:
     void UpdateScene();
     void DrawScene();
 
-    void SplitGeometry(Ruby::Mesh* mesh,
-        Ruby::OctreeNode<Ruby::SceneStaticObject>* node,
-        Ruby::Mesh* fullMesh);
-
     void SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node);
-
-    Ruby::Mesh* mBaseMesh;
-    MeshVectorWithPad mPerThreadMeshes[RUBY_MAX_THREAD_COUNT + 1];
-    ThreadInfo mThreadInfo[RUBY_MAX_THREAD_COUNT];
 
 private:
 
@@ -147,9 +100,7 @@ private:
     Ruby::CubeFrameBuffer* mIrradianceMap;
     Ruby::FrameBuffer* mBrdfMap;
 
-
-    Ruby::Mesh* mMesh[1000];
-    UINT mMeshCount;
+    Ruby::Mesh* mMesh;
 
     ShadowMap* mShadowMap;
     Ruby::FrameBuffer* mFrameBuffers[2];
@@ -158,9 +109,10 @@ private:
     Ruby::Pbr::DirectionalLight mDirLight;
     Ruby::Pbr::PointLight mPointLight;
 
-    ID3D11ShaderResourceView* mCubeMapSRV;
-
     Ruby::Scene* mScene;
 
     Ruby::FPSCamera* mCamera;
+
+    Ruby::SplitGeometryWorkQueue mQueue;
+
 };

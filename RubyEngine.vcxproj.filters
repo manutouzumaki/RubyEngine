@@ -57,6 +57,9 @@
     <ClCompile Include="RubyDebugProfiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RubyWorkQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RubyApp.h">
@@ -105,6 +108,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RubyDebugProfiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RubyWorkQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
