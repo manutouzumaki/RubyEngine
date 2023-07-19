@@ -53,7 +53,7 @@ namespace Ruby
         return mTechnique;
     }
 
-    BaseEffect::BaseEffect(ID3D11Device* device)
+    PbrColorEffect::PbrColorEffect(ID3D11Device* device)
         : Effect(device, "./FX/pbrColor.fx", "ColorTech")
     {
         mWorld = mEffect->GetVariableByName("gWorld")->AsMatrix();
@@ -68,6 +68,26 @@ namespace Ruby
         mIrradianceMap = mEffect->GetVariableByName("gIrradianceMap")->AsShaderResource();
         mPrefilteredColor = mEffect->GetVariableByName("gPrefilteredColor")->AsShaderResource();
         mBrdfLUT = mEffect->GetVariableByName("gBrdfLUT")->AsShaderResource();
+    }
+
+    PbrTextureEffect::PbrTextureEffect(ID3D11Device* device)
+        : Effect(device, "./FX/pbrTexture.fx", "TextureTech")
+    {
+        mWorld = mEffect->GetVariableByName("gWorld")->AsMatrix();
+        mWorldInvTranspose = mEffect->GetVariableByName("gWorldInvTranspose")->AsMatrix();
+        mWorldViewProj = mEffect->GetVariableByName("gWorldViewProj")->AsMatrix();
+        mDirLight = mEffect->GetVariableByName("gDirLight");
+        mPointLight = mEffect->GetVariableByName("gPointLight");
+        mEyePosW = mEffect->GetVariableByName("gEyePosW")->AsVector();
+        mLightSpaceMatrix = mEffect->GetVariableByName("gLightSpaceMatrix")->AsMatrix();
+        mShadowMap = mEffect->GetVariableByName("gShadowMap")->AsShaderResource();
+        mIrradianceMap = mEffect->GetVariableByName("gIrradianceMap")->AsShaderResource();
+        mPrefilteredColor = mEffect->GetVariableByName("gPrefilteredColor")->AsShaderResource();
+        mBrdfLUT = mEffect->GetVariableByName("gBrdfLUT")->AsShaderResource();
+        mAlbedoMap = mEffect->GetVariableByName("gAlbedoMap")->AsShaderResource();
+        mMetallicMap = mEffect->GetVariableByName("gMetallicMap")->AsShaderResource();
+        mRoughnessMap = mEffect->GetVariableByName("gRoughnessMap")->AsShaderResource();
+        mNormalMap = mEffect->GetVariableByName("gNormalMap")->AsShaderResource();
     }
 
     DepthEffect::DepthEffect(ID3D11Device* device)

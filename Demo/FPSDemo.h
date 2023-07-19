@@ -34,7 +34,8 @@ private:
     ID3D11RasterizerState* mRasterizerStateBackCull;
     ID3D11RasterizerState* mRasterizerStateFrontCull;
 
-    Ruby::BaseEffect* mBaseEffect;
+    Ruby::PbrColorEffect* mPbrColorEffect;
+    Ruby::PbrTextureEffect* mPbrTextureEffect;
     Ruby::DepthEffect* mDepthEffect;
     Ruby::HdrEffect* mHdrEffect;
     Ruby::BlurEffect* mBlurEffect;
@@ -53,11 +54,15 @@ private:
     ID3D11Texture2D* mHdrSkyTexture2D;
     ID3D11ShaderResourceView* mHdrSkySRV;
 
+    ID3D11Texture2D* mPbrTextures2D[4];
+    ID3D11ShaderResourceView* mPbrSRVs[4];
+
     Ruby::CubeFrameBuffer* mEnviromentMap;
     Ruby::CubeFrameBuffer* mIrradianceMap;
     Ruby::FrameBuffer* mBrdfMap;
 
     Ruby::Mesh* mMesh;
+    Ruby::Mesh* mGunMesh;
 
     ShadowMap* mShadowMap;
     Ruby::FrameBuffer* mFrameBuffers[2];

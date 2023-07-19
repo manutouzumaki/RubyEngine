@@ -54,7 +54,7 @@ struct VertexIn
 {
     float3 PosL : POSITION;
     float3 NormalL : NORMAL;
-    float3 Tangent : TANGENT;
+    float4 Tangent : TANGENT;
     float2 TexCoord : TEXCOORD;
 };
 

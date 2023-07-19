@@ -247,7 +247,7 @@ namespace Ruby
                 Ruby::Vertex vertex{};
                 vertex.Position = positions[i];
                 vertex.Normal = normals[i];
-                vertex.TangentU = XMFLOAT3(tangents[i].x, tangents[i].y, tangents[i].z);
+                vertex.TangentU = tangents[i];
                 vertex.TexC = texcoords[i];
                 Vertices.push_back(vertex);
             }            
@@ -382,7 +382,7 @@ namespace Ruby
         
         XMStoreFloat3(&vertex.Position, pos);
         XMStoreFloat3(&vertex.Normal, nor);
-        XMStoreFloat3(&vertex.TangentU, tan);
+        XMStoreFloat4(&vertex.TangentU, tan);
         XMStoreFloat2(&vertex.TexC, tex);
 
         return vertex;
@@ -469,14 +469,14 @@ namespace Ruby
                     __m128 posA = _mm_set_ps(1.0f, vertexA.Position.z, vertexA.Position.y, vertexA.Position.x);
 
                     __m128 norA = _mm_set_ps(0.0f, vertexA.Normal.z, vertexA.Normal.y, vertexA.Normal.x);
-                    __m128 tanA = _mm_set_ps(0.0f, vertexA.TangentU.z, vertexA.TangentU.y, vertexA.TangentU.x);
+                    __m128 tanA = _mm_set_ps(vertexA.TangentU.w, vertexA.TangentU.z, vertexA.TangentU.y, vertexA.TangentU.x);
                     __m128 texA = _mm_set_ps(0.0f, 0.0f, vertexA.TexC.y, vertexA.TexC.x);
 
                     Vertex vertexB = triangleVertex[vertexIndex + 1];
 
                     __m128 posB = _mm_set_ps(1.0f, vertexB.Position.z, vertexB.Position.y, vertexB.Position.x);
                     __m128 norB = _mm_set_ps(0.0f, vertexB.Normal.z, vertexB.Normal.y, vertexB.Normal.x);
-                    __m128 tanB = _mm_set_ps(0.0f, vertexB.TangentU.z, vertexB.TangentU.y, vertexB.TangentU.x);
+                    __m128 tanB = _mm_set_ps(vertexB.TangentU.w, vertexB.TangentU.z, vertexB.TangentU.y, vertexB.TangentU.x);
                     __m128 texB = _mm_set_ps(0.0f, 0.0f, vertexB.TexC.y, vertexB.TexC.x);
 
                     USHORT indexA = triangleIndices[vertexIndex + 0];
@@ -510,6 +510,7 @@ namespace Ruby
                         vertex.TangentU.x = M(vertTan, 0);
                         vertex.TangentU.y = M(vertTan, 1);
                         vertex.TangentU.z = M(vertTan, 2);
+                        vertex.TangentU.w = M(vertTan, 3);
                         vertex.TexC.x = M(vertTex, 0);
                         vertex.TexC.y = M(vertTex, 1);
 
@@ -538,6 +539,7 @@ namespace Ruby
                         vertex.TangentU.x = M(vertTan, 0);
                         vertex.TangentU.y = M(vertTan, 1);
                         vertex.TangentU.z = M(vertTan, 2);
+                        vertex.TangentU.w = M(vertTan, 3);
                         vertex.TexC.x = M(vertTex, 0);
                         vertex.TexC.y = M(vertTex, 1);
 

@@ -177,6 +177,10 @@ namespace Ruby
 
             if (!mPause)
             {
+                char buffer[256];
+                wsprintf(buffer, "%s FPS: %d\n", mWindowCaption, (int)(1.0f / mTimer.DeltaTime()));
+                SetWindowText(mWindow, buffer);
+
                 UpdateScene();
                 DrawScene();
             }

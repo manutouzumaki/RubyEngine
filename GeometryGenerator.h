@@ -25,7 +25,7 @@ namespace Ruby {
     struct Vertex
     {
         Vertex() : Position(), Normal(), TangentU(), TexC() {}
-        Vertex(const XMFLOAT3& p, const XMFLOAT3& n, const XMFLOAT3& t, const XMFLOAT2& uv)
+        Vertex(const XMFLOAT3& p, const XMFLOAT3& n, const XMFLOAT4& t, const XMFLOAT2& uv)
             : Position(p), Normal(n), TangentU(t), TexC(uv) {}
         Vertex(
             float px, float py, float pz,
@@ -33,11 +33,11 @@ namespace Ruby {
             float tx, float ty, float tz,
             float u, float v)
             : Position(px, py, pz), Normal(nx, ny, nz),
-            TangentU(tx, ty, tz), TexC(u, v) {}
+            TangentU(tx, ty, tz, 1.0f), TexC(u, v) {}
 
         XMFLOAT3 Position;
         XMFLOAT3 Normal;
-        XMFLOAT3 TangentU;
+        XMFLOAT4 TangentU;
         XMFLOAT2 TexC;
     };
 

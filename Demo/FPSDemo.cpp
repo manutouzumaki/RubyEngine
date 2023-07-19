@@ -49,11 +49,19 @@ FPSDemo::~FPSDemo()
     SAFE_DELETE(mBrdfMap);
 
     SAFE_DELETE(mMesh);
+    SAFE_DELETE(mGunMesh);
+
+    for (int i = 0; i < 4; ++i)
+    {
+        SAFE_RELEASE(mPbrTextures2D[i]);
+        SAFE_RELEASE(mPbrSRVs[i]);
+    }
 
     SAFE_RELEASE(mHdrSkyTexture2D);
     SAFE_RELEASE(mHdrSkySRV);
 
-    SAFE_DELETE(mBaseEffect);
+    SAFE_DELETE(mPbrColorEffect);
+    SAFE_DELETE(mPbrTextureEffect);
     SAFE_DELETE(mDepthEffect);
     SAFE_DELETE(mHdrEffect);
     SAFE_DELETE(mBlurEffect);
@@ -121,6 +129,7 @@ bool FPSDemo::Init()
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
     mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
+    mGunMesh = new Ruby::Mesh(mDevice, "./assets/gun/gun.gltf", "./assets/gun/gun.bin", "./");
 
     XMFLOAT3 min, max;
     mMesh->GetBoundingBox(min, max);
@@ -131,7 +140,7 @@ bool FPSDemo::Init()
     float centerX = 0.008616f;
     float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
     
@@ -156,8 +165,8 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -244,7 +253,8 @@ bool FPSDemo::Init()
 
     DebugProfilerBegin(Effects);
 
-    mBaseEffect = new Ruby::BaseEffect(mDevice);
+    mPbrColorEffect = new Ruby::PbrColorEffect(mDevice);
+    mPbrTextureEffect = new Ruby::PbrTextureEffect(mDevice);
     mDepthEffect = new Ruby::DepthEffect(mDevice);
     mHdrEffect = new Ruby::HdrEffect(mDevice);
     mBlurEffect = new Ruby::BlurEffect(mDevice);
@@ -260,12 +270,12 @@ bool FPSDemo::Init()
     {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
     D3DX11_PASS_DESC passDesc;
-    mBaseEffect->GetTechnique()->GetPassByIndex(0)->GetDesc(&passDesc);
+    mPbrColorEffect->GetTechnique()->GetPassByIndex(0)->GetDesc(&passDesc);
     HRESULT result = mDevice->CreateInputLayout(vertexDesc, 4, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mInputLayout);
 
     // set proj matrices
@@ -277,12 +287,14 @@ bool FPSDemo::Init()
     mDirLight.Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     XMVECTOR lightDir = XMVector3Normalize(lightPos);
     DirectX::XMStoreFloat3(&mDirLight.Direction, lightDir);
-    mBaseEffect->mDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
+    mPbrColorEffect->mDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
+    mPbrTextureEffect->mDirLight->SetRawValue(&mDirLight, 0, sizeof(Ruby::Pbr::DirectionalLight));
 
     // Point light--position is changed every frame to animate in UpdateScene function.
     mPointLight.Color = XMFLOAT4(100.0f, 100.0f, 100.0f, 1.0f);
     mPointLight.Position = XMFLOAT3(4.0f, 6.0f, -10.0f);
-    mBaseEffect->mPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
+    mPbrColorEffect->mPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
+    mPbrTextureEffect->mPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 
 
     DebugProfilerBegin(PBRTextures);
@@ -439,9 +451,14 @@ bool FPSDemo::Init()
         }
 
         // Set the cubemap to the shader
-        mBaseEffect->mIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
-        mBaseEffect->mPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
-        mBaseEffect->mBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
+        mPbrColorEffect->mIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
+        mPbrColorEffect->mPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
+        mPbrColorEffect->mBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
+
+        mPbrTextureEffect->mIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
+        mPbrTextureEffect->mPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
+        mPbrTextureEffect->mBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
+
         mSkyEffect->mCubeMap->SetResource(mEnviromentMap->GetShaderResourceView());
     }
 
@@ -455,6 +472,69 @@ bool FPSDemo::Init()
     pQuery->Release();
 
     DebugProfilerEnd(PBRTextures);
+
+
+    // load PBR Textures
+    {
+        const char* texturesPath[4] = {
+            "./assets/gun/A.png",
+            "./assets/gun/M.png",
+            "./assets/gun/R.png",
+            "./assets/gun/N.png",
+        };
+
+        for (int i = 0; i < 4; ++i)
+        {
+            stbi_set_flip_vertically_on_load(false);
+            int width, height, nrComponents;
+            unsigned char* data = stbi_load(texturesPath[i], &width, &height, &nrComponents, 0);
+            if (data)
+            {
+                // Create Texture2D
+                D3D11_TEXTURE2D_DESC texDesc;
+                texDesc.Width = width;
+                texDesc.Height = height;
+                texDesc.MipLevels = 1;
+                texDesc.ArraySize = 1;
+                texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                texDesc.SampleDesc.Count = 1;
+                texDesc.SampleDesc.Quality = 0;
+                texDesc.Usage = D3D11_USAGE_DEFAULT;
+                texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+                texDesc.CPUAccessFlags = 0;
+                texDesc.MiscFlags = 0;
+
+                D3D11_SUBRESOURCE_DATA initData{};
+                initData.pSysMem = data;
+                initData.SysMemPitch = width * sizeof(unsigned int);
+                if (FAILED(mDevice->CreateTexture2D(&texDesc, &initData, &mPbrTextures2D[i])))
+                {
+                    OutputDebugString("Error Creating PBR Texture2D\n");
+                }
+
+                // Create Shader Resource View For HDR Texture
+                D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+                srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+                srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
+                srvDesc.Texture2D.MostDetailedMip = 0;
+                if (FAILED(mDevice->CreateShaderResourceView(mPbrTextures2D[i], &srvDesc, &mPbrSRVs[i])))
+                {
+                    OutputDebugString("Error Creating PBR Shader Resource View\n");
+                }
+
+                OutputDebugStringA("PBR Textures Loaded\n");
+
+                stbi_image_free(data);
+            }
+        }
+    }
+
+    mPbrTextureEffect->mAlbedoMap->SetResource(mPbrSRVs[0]);
+    mPbrTextureEffect->mMetallicMap->SetResource(mPbrSRVs[1]);
+    mPbrTextureEffect->mRoughnessMap->SetResource(mPbrSRVs[2]);
+    mPbrTextureEffect->mNormalMap->SetResource(mPbrSRVs[3]);
+
 
     DebugProfilerEnd(Init);
 
@@ -556,7 +636,9 @@ void FPSDemo::UpdateScene()
 
     XMMATRIX V = mCamera->GetView();
     DirectX::XMStoreFloat4x4(&mView, V);
-    mBaseEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
+    mPbrColorEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
+    mPbrTextureEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
+
 
     static float timer = 0.0f;
 
@@ -566,13 +648,6 @@ void FPSDemo::UpdateScene()
         timer = 0.0f;
     }
     mSkyEffect->mTimer->SetRawValue(&timer, 0, sizeof(float));
-#if 0
-    char buffer[256];
-    wsprintf(buffer, "FPS: %d\n", (DWORD)(1.0f / dt));
-    OutputDebugStringA(buffer);
-#endif
-    //mPointLight.Position = XMFLOAT3(sinf(angle*2) * 5.0f, 6, cosf(angle) * 5.0f);
-    //mFxPointLight->SetRawValue(&mPointLight, 0, sizeof(Ruby::Pbr::PointLight));
 }
 
 void FPSDemo::DrawScene()
@@ -598,7 +673,9 @@ void FPSDemo::DrawScene()
 
         XMMATRIX lightSpaceMatrix = V * P;
         mDepthEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
-        mBaseEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
+        mPbrColorEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
+        mPbrTextureEffect->mLightSpaceMatrix->SetMatrix(reinterpret_cast<float*>(&lightSpaceMatrix));
+
 
         D3DX11_TECHNIQUE_DESC techDesc;
         mDepthEffect->GetTechnique()->GetDesc(&techDesc);
@@ -624,7 +701,9 @@ void FPSDemo::DrawScene()
 
     mImmediateContext->RSSetViewports(1, &mViewport);
 
-    mBaseEffect->mShadowMap->SetResource(mShadowMap->mDepthMapSRV);
+    mPbrColorEffect->mShadowMap->SetResource(mShadowMap->mDepthMapSRV);
+    mPbrTextureEffect->mShadowMap->SetResource(mShadowMap->mDepthMapSRV);
+
 
     XMVECTORF32 clearColor = { 0.0f, 0.0f, 0.001f, 1.0f };
     mImmediateContext->ClearRenderTargetView(mFrameBuffers[0]->GetRenderTargetView(), (float*)&clearColor);
@@ -637,24 +716,38 @@ void FPSDemo::DrawScene()
         // Set constants
         XMMATRIX viewProj = XMLoadFloat4x4(&mView) * XMLoadFloat4x4(&mProj);
         D3DX11_TECHNIQUE_DESC techDesc;
-        mBaseEffect->GetTechnique()->GetDesc(&techDesc);
+        mPbrColorEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
+            XMMATRIX world = XMMatrixTranslation(0, 0, 0);
+            XMMATRIX worldInvTranspose = InverseTranspose(world);
+            XMMATRIX worldViewProj = world * viewProj;
+            mPbrColorEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
+            mPbrColorEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+            mPbrColorEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
             for (int index = 0; index < queryResult.size(); ++index)
             {
-                XMMATRIX world = XMMatrixTranslation(0, 0, 0);
-                XMMATRIX worldInvTranspose = InverseTranspose(world);
-                XMMATRIX worldViewProj = world * viewProj;
-                mBaseEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                mBaseEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
-                mBaseEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
                 Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
                 for (UINT i = 0; i < mesh->Mat.size(); ++i)
                 {
-                    mBaseEffect->mMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
-                    mBaseEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                    mPbrColorEffect->mMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                    mPbrColorEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                     mesh->ModelMesh.Draw(mImmediateContext, i);
                 }
+            }
+
+            world = XMMatrixScaling(0.01f, 0.01f, 0.01f) * XMMatrixRotationY(angle) * XMMatrixTranslation(1.0f, 1.0f, 1);
+            worldInvTranspose = InverseTranspose(world);
+            worldViewProj = world * viewProj;
+            mPbrTextureEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
+            mPbrTextureEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+            mPbrTextureEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+
+            Ruby::Mesh* mesh = mGunMesh;
+            for (UINT i = 0; i < mesh->Mat.size(); ++i)
+            {
+                mPbrTextureEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                mesh->ModelMesh.Draw(mImmediateContext, i);
             }
         }
 
@@ -737,6 +830,6 @@ void FPSDemo::DrawScene()
     ID3D11ShaderResourceView* nullSRV[16] = { 0 };
     mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
 
-    mSwapChain->Present(0, 0);
+    mSwapChain->Present(1, 0);
 
 }

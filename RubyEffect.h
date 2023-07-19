@@ -16,10 +16,10 @@ namespace Ruby
         ID3DX11EffectTechnique* mTechnique;
     };
 
-    class BaseEffect : public Effect
+    class PbrColorEffect : public Effect
     {
     public:
-        BaseEffect(ID3D11Device* device);
+        PbrColorEffect(ID3D11Device* device);
 
         ID3DX11EffectMatrixVariable* mWorld;
         ID3DX11EffectMatrixVariable* mWorldInvTranspose;
@@ -33,6 +33,31 @@ namespace Ruby
         ID3DX11EffectShaderResourceVariable* mIrradianceMap;
         ID3DX11EffectShaderResourceVariable* mPrefilteredColor;
         ID3DX11EffectShaderResourceVariable* mBrdfLUT;
+    };
+
+    class PbrTextureEffect : public Effect
+    {
+    public:
+        PbrTextureEffect(ID3D11Device* device);
+
+        ID3DX11EffectMatrixVariable* mWorld;
+        ID3DX11EffectMatrixVariable* mWorldInvTranspose;
+        ID3DX11EffectMatrixVariable* mWorldViewProj;
+        ID3DX11EffectVariable* mDirLight;
+        ID3DX11EffectVariable* mPointLight;
+        
+        ID3DX11EffectShaderResourceVariable* mAlbedoMap;
+        ID3DX11EffectShaderResourceVariable* mMetallicMap;
+        ID3DX11EffectShaderResourceVariable* mRoughnessMap;
+        ID3DX11EffectShaderResourceVariable* mNormalMap;
+
+        ID3DX11EffectVectorVariable* mEyePosW;
+        ID3DX11EffectMatrixVariable* mLightSpaceMatrix;
+        ID3DX11EffectShaderResourceVariable* mShadowMap;
+        ID3DX11EffectShaderResourceVariable* mIrradianceMap;
+        ID3DX11EffectShaderResourceVariable* mPrefilteredColor;
+        ID3DX11EffectShaderResourceVariable* mBrdfLUT;
+
     };
 
     class DepthEffect : public Effect
