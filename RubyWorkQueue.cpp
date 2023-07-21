@@ -1,6 +1,5 @@
 #include "RubyWorkQueue.h"
-
-#define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;}
+#include "RubyDefines.h"
 
 DWORD WINAPI ThreadProc(LPVOID lpParameter)
 {

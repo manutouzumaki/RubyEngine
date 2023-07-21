@@ -212,9 +212,9 @@ namespace Ruby
 
     void App::OnResize()
     {
-        assert(mImmediateContext);
-        assert(mDevice);
-        assert(mSwapChain);
+        Assert(mImmediateContext);
+        Assert(mDevice);
+        Assert(mSwapChain);
 
         // Release the old views and the depth stencil buffer
         SAFE_RELEASE(mRenderTargetView);
@@ -433,7 +433,7 @@ namespace Ruby
 
         // Check for 4x MSAA quality support
         mDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, 4, &m4xMsaaQuality);
-        assert(m4xMsaaQuality > 0, "Error: DXGI_FORMAT_R8G8B8A8_UNORM not supported");
+        Assert(m4xMsaaQuality > 0, "Error: DXGI_FORMAT_R8G8B8A8_UNORM not supported");
 
         // Create the swapChain
         DXGI_SWAP_CHAIN_DESC sd;

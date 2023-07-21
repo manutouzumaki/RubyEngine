@@ -1,6 +1,7 @@
 // Main.cpp : Defines the entry point for the application.
 #include "Demo/FPSDemo.h"
 #include "Demo/PBRDemo.h"
+#include "Demo/BoxDemo.h"
 
 #include <crtdbg.h>
 
@@ -13,8 +14,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     OutputDebugString("Hello Ruby Engine\n");
 
-
-    FPSDemo* app = new FPSDemo(hInstance, 1280, 720, "Ruby Engine: FPS Demo", false);
+    BoxDemo* app = new BoxDemo(hInstance, 1280, 720, "Ruby Engine: Box Demo", false);
+    //FPSDemo* app = new FPSDemo(hInstance, 1280, 720, "Ruby Engine: FPS Demo", false);
     //PBRDemo* app = new PBRDemo(hInstance, 1280, 720, "Ruby Engine: PBR Demo", false);
 
 

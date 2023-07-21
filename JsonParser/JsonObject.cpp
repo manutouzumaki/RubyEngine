@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 #include <stdio.h>
-#include <assert.h>
+
 
 JsonObject::JsonObject()
     : name(nullptr), firstValue(nullptr), lastValue(nullptr),
