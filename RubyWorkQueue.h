@@ -3,7 +3,7 @@
 #include <windows.h>
 #include "RubyScene.h"
 
-#define RUBY_MAX_THREAD_COUNT 7
+#define RUBY_MAX_THREAD_COUNT 3
 #define RUBY_MAX_ENTRY_COUNT 512
 
 namespace Ruby

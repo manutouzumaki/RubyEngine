@@ -157,6 +157,8 @@ bool FPSDemo::Init()
 
     DebugProfilerEnd(SplitGeometryFast);
 
+    OutputDebugStringA("Mesh split end!!\n");
+
 
     mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 4.0f);
 
@@ -304,7 +306,7 @@ bool FPSDemo::Init()
     queryDesc.Query = D3D11_QUERY_EVENT;
     queryDesc.MiscFlags = 0;
     mDevice->CreateQuery(&queryDesc, &pQuery);
-
+    
     // Create Textures for PBR rendering
     {
 
@@ -327,7 +329,7 @@ bool FPSDemo::Init()
             mImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             mImmediateContext->RSSetViewports(1, &mViewport);
             mImmediateContext->RSSetState(mRasterizerStateFrontCull);
-
+            
             // create enviroment map
             {
                 // Set the viewport transform.
@@ -373,8 +375,8 @@ bool FPSDemo::Init()
                     }
                 }
             }
-
-
+            
+            
             // create irradiance map
             {
                 mViewport.TopLeftX = 0;
@@ -406,6 +408,7 @@ bool FPSDemo::Init()
                     }
                 }
             }
+            
 
             mImmediateContext->RSSetState(mRasterizerStateBackCull);
 
@@ -450,6 +453,7 @@ bool FPSDemo::Init()
             mImmediateContext->RSSetViewports(1, &mViewport);
         }
 
+        
         // Set the cubemap to the shader
         mPbrColorEffect->mIrradianceMap->SetResource(mIrradianceMap->GetShaderResourceView());
         mPbrColorEffect->mPrefilteredColor->SetResource(mEnviromentMap->GetShaderResourceView());
@@ -460,18 +464,21 @@ bool FPSDemo::Init()
         mPbrTextureEffect->mBrdfLUT->SetResource(mBrdfMap->GetShaderResourceView());
 
         mSkyEffect->mCubeMap->SetResource(mEnviromentMap->GetShaderResourceView());
+        
     }
 
     mImmediateContext->End(pQuery);
     BOOL data = false;
     
     // wait until the GPU finish procesing the commands
-    while (data == 0 && mImmediateContext->GetData(pQuery, &data, sizeof(BOOL), 0) != S_OK);
+   while (data == 0 && mImmediateContext->GetData(pQuery, &data, sizeof(BOOL), 0) != S_OK);
     
 
     pQuery->Release();
 
     DebugProfilerEnd(PBRTextures);
+
+    OutputDebugStringA("PBR texture Loaded!!\n");
 
 
     // load PBR Textures
@@ -534,6 +541,8 @@ bool FPSDemo::Init()
     mPbrTextureEffect->mMetallicMap->SetResource(mPbrSRVs[1]);
     mPbrTextureEffect->mRoughnessMap->SetResource(mPbrSRVs[2]);
     mPbrTextureEffect->mNormalMap->SetResource(mPbrSRVs[3]);
+
+    OutputDebugStringA("Gun Textures Ended\n");
 
 
     DebugProfilerEnd(Init);
