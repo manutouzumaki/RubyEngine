@@ -1,6 +1,12 @@
 #pragma once
 
 #include "../RubyApp.h"
+#include "../RubyCamera.h"
+
+#include "../Physics/Particle.h"
+#include "../Physics/ParticleForceGenerator.h"
+
+#define PARTICLE_COUNT 2
 
 class BoxDemo : public Ruby::App
 {
@@ -32,9 +38,18 @@ private:
 
     ID3D11InputLayout* mInputLayout;
 
-    XMFLOAT4X4 mWorld;
+    XMFLOAT4X4 mWorld[PARTICLE_COUNT];
     XMFLOAT4X4 mView;
     XMFLOAT4X4 mProj;
+
+    Ruby::Physics::Particle* mParticle[PARTICLE_COUNT];
+    Ruby::Physics::ParticleGravity* mGravityFG;
+    Ruby::Physics::ParticleDrag* mDragFG;
+    Ruby::Physics::ParticleForceRegistry* mForceRegistry;
+
+    Ruby::FPSCamera* mCamera;
+
+
 };
 
 

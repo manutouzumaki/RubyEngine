@@ -159,6 +159,7 @@
     <ClCompile Include="JsonParser\JsonScanner.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Demo\PBRDemo.cpp" />
+    <ClCompile Include="Physics\ParticleForceGenerator.cpp" />
     <ClCompile Include="Physics\Particle.cpp" />
     <ClCompile Include="RubyApp.cpp" />
     <ClCompile Include="RubyCamera.cpp" />
@@ -171,6 +172,7 @@
     <ClCompile Include="RubyWorkQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Physics\ParticleForceGenerator.h" />
     <ClInclude Include="Physics\Particle.h" />
     <ClInclude Include="Physics\Core.h" />
     <ClInclude Include="Demo\BoxDemo.h" />

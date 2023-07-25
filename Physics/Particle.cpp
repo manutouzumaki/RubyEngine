@@ -16,6 +16,7 @@ namespace Ruby { namespace Physics {
         // work out the acceleration from the force
         // (We'll add to this vector when we come to generate forces.)
         Vector3 resultingAcc = acceleration;
+        resultingAcc.AddScaleVector(forceAccum, inverseMass);
 
         // update linear velocity from the acceleration
         velocity.AddScaleVector(resultingAcc, duration);

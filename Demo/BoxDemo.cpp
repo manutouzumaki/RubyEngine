@@ -1,5 +1,7 @@
 #include "BoxDemo.h"
 
+using namespace DirectX;
+
 BoxDemo::BoxDemo(HINSTANCE instance, UINT clientWidth, UINT clientHeight, const char* windowCaption, bool enable4xMsaa)
     : Ruby::App(instance, clientWidth, clientHeight, windowCaption, enable4xMsaa),
     mVertexBuffer(nullptr),
@@ -10,13 +12,27 @@ BoxDemo::BoxDemo(HINSTANCE instance, UINT clientWidth, UINT clientHeight, const 
     mInputLayout(nullptr)
 {
     XMMATRIX identity = XMMatrixIdentity();
-    XMStoreFloat4x4(&mWorld, identity);
+    for (int i = 0; i < PARTICLE_COUNT; ++i)
+    {
+        XMStoreFloat4x4(&mWorld[i], identity);
+    }
     XMStoreFloat4x4(&mView, identity);
     XMStoreFloat4x4(&mProj, identity);
 }
 
 BoxDemo::~BoxDemo()
 {
+    SAFE_DELETE(mCamera);
+
+    for (int i = 0; i < PARTICLE_COUNT; ++i)
+    {
+        SAFE_DELETE(mParticle[i]);
+    }
+
+    SAFE_DELETE(mGravityFG);
+    SAFE_DELETE(mDragFG);
+    SAFE_DELETE(mForceRegistry);
+
     SAFE_RELEASE(mVertexBuffer);
     SAFE_RELEASE(mIndexBuffer);
     SAFE_RELEASE(mEffect);
@@ -30,7 +46,8 @@ bool BoxDemo::Init()
 
     // Create the data for the cube
     Ruby::GeometryGenerator generator;
-    generator.CreateBox(2, 2, 2, mCubeData);
+    //generator.CreateBox(2, 2, 2, mCubeData);
+    generator.CreateSphere(0.5f, 16, 16, mCubeData);
 
     D3D11_BUFFER_DESC vbd;
     vbd.Usage = D3D11_USAGE_IMMUTABLE;
@@ -117,13 +134,35 @@ bool BoxDemo::Init()
     XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
     XMStoreFloat4x4(&mProj, P);
 
-    // Build the view matrix.
-    XMVECTOR pos = XMVectorSet(0, 0, -10.0f, 1.0f);
-    XMVECTOR target = XMVectorZero();
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 0, -10), XMFLOAT3(0, 0, 0), 4);
 
-    XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-    XMStoreFloat4x4(&mView, V);
+    mParticle[0] = new Ruby::Physics::Particle();
+    mParticle[0]->SetPosition(1, 0, 0);
+    mParticle[0]->SetMass(1.0);
+    mParticle[0]->SetDamping(0.999);
+
+    mParticle[1] = new Ruby::Physics::Particle();
+    mParticle[1]->SetPosition(-1, 0, 0);
+    mParticle[1]->SetMass(1.0);
+    mParticle[1]->SetDamping(0.3);
+
+    Ruby::Physics::Vector3 gravity(0.0, -10.0, 0.0);
+    mGravityFG = new Ruby::Physics::ParticleGravity(gravity);
+    mDragFG = new Ruby::Physics::ParticleDrag(0.5, 0.5);
+    mForceRegistry = new Ruby::Physics::ParticleForceRegistry();
+
+    mForceRegistry->Add(mParticle[0], mGravityFG);
+    mForceRegistry->Add(mParticle[0], mDragFG);
+
+    mForceRegistry->Add(mParticle[1], mGravityFG);
+    mForceRegistry->Add(mParticle[1], mDragFG);
+
+    for (int i = 0; i < PARTICLE_COUNT; ++i)
+    {
+        Ruby::Physics::Vector3 pos = mParticle[i]->GetPosition();
+        XMMATRIX world = XMMatrixTranslation(pos.x, pos.y, pos.z);
+        XMStoreFloat4x4(&mWorld[i], world);
+    }
 
     return true;
 }
@@ -138,10 +177,79 @@ void BoxDemo::OnResize()
 
 void BoxDemo::UpdateScene()
 {
-    static float angle = 0.0f;
-    XMMATRIX world = XMMatrixRotationY(angle) * XMMatrixRotationX(angle * 2.0f);
-    XMStoreFloat4x4(&mWorld, world);
-    angle += 1.0f * mTimer.DeltaTime();
+    // Camera Update code ...
+    {
+        float dt = mTimer.DeltaTime();
+
+        if (mInput.KeyIsDown('W'))
+        {
+            mCamera->MoveForward(dt);
+        }
+        if (mInput.KeyIsDown('S'))
+        {
+            mCamera->MoveBackward(dt);
+        }
+        if (mInput.KeyIsDown('A'))
+        {
+            mCamera->MoveLeft(dt);
+        }
+        if (mInput.KeyIsDown('D'))
+        {
+            mCamera->MoveRight(dt);
+        }
+        if (mInput.KeyIsDown('R'))
+        {
+            mCamera->MoveUp(dt);
+        }
+        if (mInput.KeyIsDown('F'))
+        {
+            mCamera->MoveDown(dt);
+        }
+
+        if (mInput.MouseButtonJustDown(1))
+        {
+            ShowCursor(false);
+        }
+        if (mInput.MouseButtonJustUp(1))
+        {
+            ShowCursor(true);
+        }
+
+        if (mInput.MouseButtonIsDown(1))
+        {
+            int deltaX = mInput.MousePosX() - mInput.MouseLastPosX();
+            int deltaY = mInput.MousePosY() - mInput.MouseLastPosY();
+
+            mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f);
+
+            SetCursorPos(mWindowX + mClientWidth / 2, mWindowY + mClientHeight / 2);
+            mInput.mCurrent.mouseX = mClientWidth / 2;
+            mInput.mCurrent.mouseY = mClientHeight / 2;
+            mInput.mLast.mouseX = mClientWidth / 2;
+            mInput.mLast.mouseY = mClientHeight / 2;
+
+        }
+
+        mCamera->Update(dt);
+        XMStoreFloat4x4(&mView, mCamera->GetView());
+
+    }
+
+    if (mInput.KeyIsDown(VK_SPACE))
+    {
+        mForceRegistry->UpdateForces(mTimer.DeltaTime());
+        for (int i = 0; i < PARTICLE_COUNT; ++i)
+        {
+            mParticle[i]->Integrate(mTimer.DeltaTime());
+
+            Ruby::Physics::Vector3 pos = mParticle[i]->GetPosition();
+            XMMATRIX world = XMMatrixTranslation(pos.x, pos.y, pos.z);
+            XMStoreFloat4x4(&mWorld[i], world);
+        }
+    }
+
+
+
 }
 
 void BoxDemo::DrawScene()
@@ -158,21 +266,25 @@ void BoxDemo::DrawScene()
     mImmediateContext->IASetVertexBuffers(0, 1, &mVertexBuffer, &stride, &offet);
     mImmediateContext->IASetIndexBuffer(mIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
-    // Set constants
-    XMMATRIX world = XMLoadFloat4x4(&mWorld);
     XMMATRIX view = XMLoadFloat4x4(&mView);
     XMMATRIX proj = XMLoadFloat4x4(&mProj);
-    XMMATRIX worldViewProj = world * view * proj;
-
-    mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
-    mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
 
     D3DX11_TECHNIQUE_DESC techDesc;
     mTechnique->GetDesc(&techDesc);
     for (UINT p = 0; p < techDesc.Passes; ++p)
     {
-        mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
-        mImmediateContext->DrawIndexed(mCubeData.Indices.size(), 0, 0);
+        for (int i = 0; i < PARTICLE_COUNT; ++i)
+        {
+            // Set constants
+            XMMATRIX world = XMLoadFloat4x4(&mWorld[i]);
+            XMMATRIX worldViewProj = world * view * proj;
+
+            mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+            mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+
+            mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+            mImmediateContext->DrawIndexed(mCubeData.Indices.size(), 0, 0);
+        }
     }
 
     mSwapChain->Present(1, 0);
