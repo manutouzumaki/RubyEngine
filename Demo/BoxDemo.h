@@ -5,8 +5,9 @@
 
 #include "../Physics/Particle.h"
 #include "../Physics/ParticleForceGenerator.h"
+#include "../Physics/Collision.h"
 
-#define PARTICLE_COUNT 2
+#define PARTICLE_COUNT 1
 
 class BoxDemo : public Ruby::App
 {
@@ -27,9 +28,13 @@ public:
 private:
 
     Ruby::MeshData mCubeData;
+    Ruby::MeshData mSphereData;
 
     ID3D11Buffer* mVertexBuffer;
     ID3D11Buffer* mIndexBuffer;
+
+    ID3D11Buffer* mVertexBufferSphere;
+    ID3D11Buffer* mIndexBufferSphere;
 
     ID3DX11Effect* mEffect;
     ID3DX11EffectTechnique* mTechnique;
@@ -46,6 +51,8 @@ private:
     Ruby::Physics::ParticleGravity* mGravityFG;
     Ruby::Physics::ParticleDrag* mDragFG;
     Ruby::Physics::ParticleForceRegistry* mForceRegistry;
+
+    std::vector<Ruby::Physics::Triangle> mTriangles;
 
     Ruby::FPSCamera* mCamera;
 

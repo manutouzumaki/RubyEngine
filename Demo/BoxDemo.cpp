@@ -35,6 +35,8 @@ BoxDemo::~BoxDemo()
 
     SAFE_RELEASE(mVertexBuffer);
     SAFE_RELEASE(mIndexBuffer);
+    SAFE_RELEASE(mVertexBufferSphere);
+    SAFE_RELEASE(mIndexBufferSphere);
     SAFE_RELEASE(mEffect);
     SAFE_RELEASE(mInputLayout);
 }
@@ -47,38 +49,102 @@ bool BoxDemo::Init()
     // Create the data for the cube
     Ruby::GeometryGenerator generator;
     //generator.CreateBox(2, 2, 2, mCubeData);
-    generator.CreateSphere(0.5f, 16, 16, mCubeData);
+    generator.CreateSphere(5.0f, 16, 16, mCubeData);
+    generator.CreateSphere(0.5f, 16, 16, mSphereData);
+    /*
+    Ruby::Vertex vertex0 = Ruby::Vertex(XMFLOAT3(-4.0f, -4.0f, 0.0f), XMFLOAT3(0, 0, -1), XMFLOAT4(0, 0, 0, 1), XMFLOAT2(0, 0));
+    Ruby::Vertex vertex1 = Ruby::Vertex(XMFLOAT3( 4.0f, -4.0f, 0.0f), XMFLOAT3(0, 0, -1), XMFLOAT4(0, 0, 0, 1), XMFLOAT2(0, 0));
+    Ruby::Vertex vertex2 = Ruby::Vertex(XMFLOAT3( 0.0f,  4.0f, 0.0f), XMFLOAT3(0, 0, -1), XMFLOAT4(0, 0, 0, 1), XMFLOAT2(0, 0));
+    mCubeData.Vertices.push_back(vertex0);
+    mCubeData.Vertices.push_back(vertex1);
+    mCubeData.Vertices.push_back(vertex2);
+    mCubeData.Indices.push_back(0);
+    mCubeData.Indices.push_back(2);
+    mCubeData.Indices.push_back(1);
+    */
 
-    D3D11_BUFFER_DESC vbd;
-    vbd.Usage = D3D11_USAGE_IMMUTABLE;
-    vbd.ByteWidth = sizeof(Ruby::Vertex) * mCubeData.Vertices.size();
-    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    vbd.CPUAccessFlags = 0;
-    vbd.MiscFlags = 0;
-    vbd.StructureByteStride = 0;
-    D3D11_SUBRESOURCE_DATA vinitData;
-    vinitData.pSysMem = mCubeData.Vertices.data();
-    HRESULT result = mDevice->CreateBuffer(&vbd, &vinitData, &mVertexBuffer);
-    if (FAILED(result))
+    for (int i = 0; i < mCubeData.Indices.size(); i += 3)
     {
-        MessageBox(0, "Error: failed loading vertex data", 0, 0);
-        return false;
+        XMFLOAT3 a = mCubeData.Vertices[mCubeData.Indices[i + 0]].Position;
+        XMFLOAT3 b = mCubeData.Vertices[mCubeData.Indices[i + 1]].Position;
+        XMFLOAT3 c = mCubeData.Vertices[mCubeData.Indices[i + 2]].Position;
+        Ruby::Physics::Triangle triangle;
+        triangle.a = Ruby::Physics::Vector3(a.x, a.y, a.z);
+        triangle.b = Ruby::Physics::Vector3(b.x, b.y, b.z);
+        triangle.c = Ruby::Physics::Vector3(c.x, c.y, c.z);
+        mTriangles.push_back(triangle);
     }
 
-    D3D11_BUFFER_DESC ibd;
-    ibd.Usage = D3D11_USAGE_IMMUTABLE;
-    ibd.ByteWidth = sizeof(USHORT) * mCubeData.Indices.size();
-    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    ibd.CPUAccessFlags = 0;
-    ibd.MiscFlags = 0;
-    ibd.StructureByteStride = 0;
-    D3D11_SUBRESOURCE_DATA iinitData;
-    iinitData.pSysMem = mCubeData.Indices.data();
-    result = mDevice->CreateBuffer(&ibd, &iinitData, &mIndexBuffer);
-    if (FAILED(result))
+
+
+    // load triangle to the gpu
     {
-        MessageBox(0, "Error: falied loading index data", 0, 0);
-        return false;
+        D3D11_BUFFER_DESC vbd;
+        vbd.Usage = D3D11_USAGE_IMMUTABLE;
+        vbd.ByteWidth = sizeof(Ruby::Vertex) * mCubeData.Vertices.size();
+        vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vbd.CPUAccessFlags = 0;
+        vbd.MiscFlags = 0;
+        vbd.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA vinitData;
+        vinitData.pSysMem = mCubeData.Vertices.data();
+        HRESULT result = mDevice->CreateBuffer(&vbd, &vinitData, &mVertexBuffer);
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: failed loading vertex data", 0, 0);
+            return false;
+        }
+
+        D3D11_BUFFER_DESC ibd;
+        ibd.Usage = D3D11_USAGE_IMMUTABLE;
+        ibd.ByteWidth = sizeof(USHORT) * mCubeData.Indices.size();
+        ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        ibd.CPUAccessFlags = 0;
+        ibd.MiscFlags = 0;
+        ibd.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA iinitData;
+        iinitData.pSysMem = mCubeData.Indices.data();
+        result = mDevice->CreateBuffer(&ibd, &iinitData, &mIndexBuffer);
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: falied loading index data", 0, 0);
+            return false;
+        }
+    }
+
+    // load sphere to the gpu
+    {
+        D3D11_BUFFER_DESC vbd;
+        vbd.Usage = D3D11_USAGE_IMMUTABLE;
+        vbd.ByteWidth = sizeof(Ruby::Vertex) * mSphereData.Vertices.size();
+        vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vbd.CPUAccessFlags = 0;
+        vbd.MiscFlags = 0;
+        vbd.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA vinitData;
+        vinitData.pSysMem = mSphereData.Vertices.data();
+        HRESULT result = mDevice->CreateBuffer(&vbd, &vinitData, &mVertexBufferSphere);
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: failed loading vertex data", 0, 0);
+            return false;
+        }
+
+        D3D11_BUFFER_DESC ibd;
+        ibd.Usage = D3D11_USAGE_IMMUTABLE;
+        ibd.ByteWidth = sizeof(USHORT) * mSphereData.Indices.size();
+        ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        ibd.CPUAccessFlags = 0;
+        ibd.MiscFlags = 0;
+        ibd.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA iinitData;
+        iinitData.pSysMem = mSphereData.Indices.data();
+        result = mDevice->CreateBuffer(&ibd, &iinitData, &mIndexBufferSphere);
+        if (FAILED(result))
+        {
+            MessageBox(0, "Error: falied loading index data", 0, 0);
+            return false;
+        }
     }
 
     // create the shaders and fx
@@ -90,7 +156,7 @@ bool BoxDemo::Init()
 
     ID3D10Blob* compiledShader = 0;
     ID3D10Blob* compilationMsgs = 0;
-    result = D3DX11CompileFromFile("./FX/color.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
+    HRESULT result = D3DX11CompileFromFile("./FX/color.fx", 0, 0, 0, "fx_5_0", shaderFlags, 0, 0, &compiledShader, &compilationMsgs, 0);
 
     if (compilationMsgs != 0)
     {
@@ -131,20 +197,15 @@ bool BoxDemo::Init()
     result = mDevice->CreateInputLayout(vertexDesc, 4, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mInputLayout);
 
     // set proj matrices
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 0.01f, 100.0f);
     XMStoreFloat4x4(&mProj, P);
 
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 0, -10), XMFLOAT3(0, 0, 0), 4);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 0, -10), XMFLOAT3(0, 0, 0), 32);
 
     mParticle[0] = new Ruby::Physics::Particle();
-    mParticle[0]->SetPosition(1, 0, 0);
+    mParticle[0]->SetPosition(0, 0, 0);
     mParticle[0]->SetMass(1.0);
     mParticle[0]->SetDamping(0.999);
-
-    mParticle[1] = new Ruby::Physics::Particle();
-    mParticle[1]->SetPosition(-1, 0, 0);
-    mParticle[1]->SetMass(1.0);
-    mParticle[1]->SetDamping(0.3);
 
     Ruby::Physics::Vector3 gravity(0.0, -10.0, 0.0);
     mGravityFG = new Ruby::Physics::ParticleGravity(gravity);
@@ -153,9 +214,6 @@ bool BoxDemo::Init()
 
     mForceRegistry->Add(mParticle[0], mGravityFG);
     mForceRegistry->Add(mParticle[0], mDragFG);
-
-    mForceRegistry->Add(mParticle[1], mGravityFG);
-    mForceRegistry->Add(mParticle[1], mDragFG);
 
     for (int i = 0; i < PARTICLE_COUNT; ++i)
     {
@@ -230,7 +288,7 @@ void BoxDemo::UpdateScene()
 
         }
 
-        mCamera->Update(dt);
+        mCamera->Update(dt, mTriangles.data(), mTriangles.size());
         XMStoreFloat4x4(&mView, mCamera->GetView());
 
     }
@@ -285,6 +343,23 @@ void BoxDemo::DrawScene()
             mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
             mImmediateContext->DrawIndexed(mCubeData.Indices.size(), 0, 0);
         }
+    }
+
+    mImmediateContext->IASetVertexBuffers(0, 1, &mVertexBufferSphere, &stride, &offet);
+    mImmediateContext->IASetIndexBuffer(mIndexBufferSphere, DXGI_FORMAT_R16_UINT, 0);
+
+
+    XMFLOAT3 camp = mCamera->GetPosition();
+    XMMATRIX world = XMMatrixScaling(0.2, 0.2, 0.2) * XMMatrixTranslation(camp.x, camp.y, camp.z);
+    XMMATRIX worldViewProj = world * view * proj;
+
+    mTechnique->GetDesc(&techDesc);
+    for (UINT p = 0; p < techDesc.Passes; ++p)
+    {
+        mFxWorld->SetMatrix(reinterpret_cast<float*>(&world));
+        mFxWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+        mTechnique->GetPassByIndex(p)->Apply(0, mImmediateContext);
+        mImmediateContext->DrawIndexed(mSphereData.Indices.size(), 0, 0);
     }
 
     mSwapChain->Present(1, 0);

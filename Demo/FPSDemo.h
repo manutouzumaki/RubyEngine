@@ -76,5 +76,4 @@ private:
     Ruby::FPSCamera* mCamera;
 
     Ruby::SplitGeometryWorkQueue mQueue;
-
 };

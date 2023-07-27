@@ -63,6 +63,7 @@ namespace Ruby {
 
 		class ParticleAnchoredSpring : public ParticleForceGenerator
 		{
+		protected:
 			Vector3* anchor;
 			real springConstant;
 			real restLength;

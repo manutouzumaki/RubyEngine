@@ -51,7 +51,7 @@ namespace Ruby { namespace Physics {
         Particle::inverseMass = inverseMass;
     }
 
-    real Particle::GetInverseMass(const real inverseMass)
+    real Particle::GetInverseMass()
     {
         return inverseMass;
     }

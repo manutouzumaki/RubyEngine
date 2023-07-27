@@ -159,10 +159,12 @@
     <ClCompile Include="JsonParser\JsonScanner.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Demo\PBRDemo.cpp" />
+    <ClCompile Include="Physics\ParticleContact.cpp" />
     <ClCompile Include="Physics\ParticleForceGenerator.cpp" />
     <ClCompile Include="Physics\Particle.cpp" />
     <ClCompile Include="RubyApp.cpp" />
     <ClCompile Include="RubyCamera.cpp" />
+    <ClCompile Include="Physics\Collision.cpp" />
     <ClCompile Include="RubyDebugProfiler.cpp" />
     <ClCompile Include="RubyEffect.cpp" />
     <ClCompile Include="RubyInput.cpp" />
@@ -172,6 +174,7 @@
     <ClCompile Include="RubyWorkQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Physics\ParticleContact.h" />
     <ClInclude Include="Physics\ParticleForceGenerator.h" />
     <ClInclude Include="Physics\Particle.h" />
     <ClInclude Include="Physics\Core.h" />
@@ -186,6 +189,7 @@
     <ClInclude Include="Physics\Precision.h" />
     <ClInclude Include="RubyApp.h" />
     <ClInclude Include="RubyCamera.h" />
+    <ClInclude Include="Physics\Collision.h" />
     <ClInclude Include="RubyDebugProfiler.h" />
     <ClInclude Include="RubyDefines.h" />
     <ClInclude Include="RubyEffect.h" />

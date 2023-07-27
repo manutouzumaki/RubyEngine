@@ -67,7 +67,20 @@ namespace Ruby
                 }
                 if (mesh != nullptr)
                 {
-                    work->pNode->pObjList.push_back(mesh);
+                    SceneStaticObject object{};
+                    object.mMesh = mesh;
+                    for (int i = 0; i < mesh->Indices.size(); i += 3)
+                    {
+                        XMFLOAT3 a = mesh->Vertices[mesh->Indices[i + 0]].Position;
+                        XMFLOAT3 b = mesh->Vertices[mesh->Indices[i + 1]].Position;
+                        XMFLOAT3 c = mesh->Vertices[mesh->Indices[i + 2]].Position;
+                        Ruby::Physics::Triangle triangle;
+                        triangle.a = Ruby::Physics::Vector3(a.x, a.y, a.z);
+                        triangle.b = Ruby::Physics::Vector3(b.x, b.y, b.z);
+                        triangle.c = Ruby::Physics::Vector3(c.x, c.y, c.z);
+                        object.mTriangles.push_back(triangle);
+                    }
+                    work->pNode->pObjList.push_back(object);
                 }
                 InterlockedIncrement((LONG volatile*)&mCompletitionCount);
             }

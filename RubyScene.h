@@ -2,6 +2,7 @@
 #include "RubyMesh.h"
 
 #include "RubyDefines.h"
+#include "Physics/Collision.h"
 
 namespace Ruby
 {
@@ -16,17 +17,11 @@ namespace Ruby
 
     class SceneStaticObject
     {
-    private:
+    public:
         XMFLOAT4X4 world;
         Mesh* mMesh;
+        std::vector<Ruby::Physics::Triangle> mTriangles;
     };
-
-    class SceneObject
-    {
-    private:
-        Mesh* mMesh;
-    };
-    
 
     template<typename Type>
     struct OctreeNode
@@ -40,7 +35,7 @@ namespace Ruby
         XMFLOAT3 center;
         float halfWidth;
         OctreeNode<Type>* pChild[8];
-        std::vector<Mesh*> pObjList;
+        std::vector<Type> pObjList;
     };
 
     template<typename T>
@@ -71,10 +66,10 @@ namespace Ruby
     template<typename T>
     OctreeNode<T>::~OctreeNode()
     {
-        for (int i = 0; i < pObjList.size(); ++i)
-        {
-            SAFE_DELETE(pObjList[i]);
-        }
+        //for (int i = 0; i < pObjList.size(); ++i)
+        //{
+            //SAFE_DELETE(pObjList[i]);
+        //}
 
 
         for (int i = 0; i < 8; ++i)
@@ -147,11 +142,9 @@ namespace Ruby
     public:
         Scene(XMFLOAT3 center, float halfWidth, float stopDepth)
             :
-            mStaticObjectTree(center, halfWidth, stopDepth),
-            mObjectTree(center, halfWidth, stopDepth) {}
+            mStaticObjectTree(center, halfWidth, stopDepth) {}
         ~Scene() {}
         Octree<SceneStaticObject> mStaticObjectTree;
-        Octree<SceneObject> mObjectTree;
     };
 }
 

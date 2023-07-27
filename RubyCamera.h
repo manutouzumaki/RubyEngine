@@ -2,6 +2,8 @@
 
 #include <DirectXMath.h>
 
+#include "Physics/Collision.h"
+
 using namespace DirectX;
 
 namespace Ruby
@@ -18,10 +20,16 @@ namespace Ruby
         XMVECTOR mWorldFront;
         XMVECTOR mWorldUp;
 
+        XMFLOAT3 mViewPos;
+
         XMFLOAT3 mPosition;
+        XMFLOAT3 mVelocity;
+        XMFLOAT3 mAcceleration;
+
         XMFLOAT3 mRotation;
 
         float mSpeed;
+        float mDumping;
  
     public:
         FPSCamera(XMFLOAT3 position, XMFLOAT3 rotation, float speed);
@@ -29,8 +37,11 @@ namespace Ruby
 
         XMMATRIX GetView();
         XMFLOAT3 GetPosition();
+        XMFLOAT3 GetVelocity();
+        XMFLOAT3 GetViewDirection();
+        XMFLOAT3 GetViewPosition();
 
-        void Update(float dt);
+        void Update(float dt, Ruby::Physics::Triangle* triangles, int count);
         void MouseMove(float mouseX, float mouseY);
         void MoveForward(float dt);
         void MoveBackward(float dt);

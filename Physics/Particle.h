@@ -23,7 +23,7 @@ namespace Ruby { namespace Physics {
         void SetMass(const real mass);
         real GetMass() const;
         void SetInverseMass(const real inverseMass);
-        real GetInverseMass(const real inverseMass);
+        real GetInverseMass();
         bool HasFiniteMass() const;
         
         void SetDamping(const real damping);

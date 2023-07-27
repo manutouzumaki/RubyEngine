@@ -4,6 +4,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <vector>
+
 static XMMATRIX InverseTranspose(CXMMATRIX M)
 {
     // Inverse-transpose is just applied to normals.  So zero out 
@@ -130,6 +132,27 @@ bool FPSDemo::Init()
 
     mMesh = new Ruby::Mesh(mDevice, "./assets/level3.gltf", "./assets/level3.bin", "./");
     mGunMesh = new Ruby::Mesh(mDevice, "./assets/gun/gun.gltf", "./assets/gun/gun.bin", "./");
+    
+    /*
+    
+    TODO IMPORTANT(MANUTO):
+        - FIX memory leak in the octree
+
+    */
+
+    /*
+    for (int i = 0; i < mMesh->Indices.size(); i += 3)
+    {
+        XMFLOAT3 a = mMesh->Vertices[mMesh->Indices[i + 0]].Position;
+        XMFLOAT3 b = mMesh->Vertices[mMesh->Indices[i + 1]].Position;
+        XMFLOAT3 c = mMesh->Vertices[mMesh->Indices[i + 2]].Position;
+        Ruby::Physics::Triangle triangle;
+        triangle.a = Ruby::Physics::Vector3(a.x, a.y, a.z);
+        triangle.b = Ruby::Physics::Vector3(b.x, b.y, b.z);
+        triangle.c = Ruby::Physics::Vector3(c.x, c.y, c.z);
+        mTriangles.push_back(triangle);
+    }
+    */
 
     XMFLOAT3 min, max;
     mMesh->GetBoundingBox(min, max);
@@ -140,7 +163,7 @@ bool FPSDemo::Init()
     float centerX = 0.008616f;
     float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
     
@@ -160,7 +183,7 @@ bool FPSDemo::Init()
     OutputDebugStringA("Mesh split end!!\n");
 
 
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 4.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 32.0f);
 
     DebugProfilerBegin(HDRTexture);
     // Load HDR Texture
@@ -625,7 +648,17 @@ void FPSDemo::UpdateScene()
 
     }
 
-    mCamera->Update(dt);
+    std::vector<Ruby::OctreeNode<Ruby::SceneStaticObject>*> queryResult;
+    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(4, 4, 4), queryResult);
+
+    std::vector<Ruby::Physics::Triangle> triangles;
+    for (int i = 0; i < queryResult.size(); ++i)
+    {
+        Ruby::SceneStaticObject object = queryResult[i]->pObjList[0];
+        triangles.insert(triangles.end(), object.mTriangles.begin(), object.mTriangles.end());
+    }
+
+    mCamera->Update(dt, triangles.data(), triangles.size());
 
 
 
@@ -637,7 +670,7 @@ void FPSDemo::UpdateScene()
     XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
 
     // Build the view matrix.
-    XMFLOAT3 eyePos = mCamera->GetPosition();
+    XMFLOAT3 eyePos = mCamera->GetViewPosition();
 
     XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
     XMVECTOR target = XMVectorSet(targetDir.x, targetDir.y, targetDir.z, 0.0f);
@@ -694,11 +727,11 @@ void FPSDemo::DrawScene()
             {
                 XMMATRIX world = XMMatrixTranslation(0, 0, 0);
                 mDepthEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
-                Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
-                for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                Ruby::SceneStaticObject object = queryResult[index]->pObjList.back();
+                for (UINT i = 0; i < object.mMesh->Mat.size(); ++i)
                 {
                     mDepthEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
-                    mesh->ModelMesh.Draw(mImmediateContext, i);
+                    object.mMesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
         }
@@ -736,16 +769,17 @@ void FPSDemo::DrawScene()
             mPbrColorEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
             for (int index = 0; index < queryResult.size(); ++index)
             {
-                Ruby::Mesh* mesh = queryResult[index]->pObjList.back();
-                for (UINT i = 0; i < mesh->Mat.size(); ++i)
+                Ruby::SceneStaticObject object = queryResult[index]->pObjList.back();
+                for (UINT i = 0; i < object.mMesh->Mat.size(); ++i)
                 {
-                    mPbrColorEffect->mMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                    mPbrColorEffect->mMaterial->SetRawValue(&object.mMesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
                     mPbrColorEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
-                    mesh->ModelMesh.Draw(mImmediateContext, i);
+                    object.mMesh->ModelMesh.Draw(mImmediateContext, i);
                 }
             }
-
-            world = XMMatrixScaling(0.01f, 0.01f, 0.01f) * XMMatrixRotationY(angle) * XMMatrixTranslation(1.0f, 1.0f, 1);
+            
+            XMFLOAT3 camPos = mCamera->GetPosition();
+            world = XMMatrixScaling(0.01f, 0.01f, 0.01f) * XMMatrixTranslation(camPos.x, camPos.y, camPos.z);
             worldInvTranspose = InverseTranspose(world);
             worldViewProj = world * viewProj;
             mPbrTextureEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
@@ -763,7 +797,7 @@ void FPSDemo::DrawScene()
         mSkyEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            XMFLOAT3 eyePos = mCamera->GetPosition();
+            XMFLOAT3 eyePos = mCamera->GetViewPosition();
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
             mSkyEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
