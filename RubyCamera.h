@@ -38,7 +38,10 @@ namespace Ruby
         XMMATRIX GetView();
         XMFLOAT3 GetPosition();
         XMFLOAT3 GetVelocity();
+        XMFLOAT3 GetRotation();
         XMFLOAT3 GetViewDirection();
+        XMFLOAT3 GetViewRight();
+        XMFLOAT3 GetViewUp();
         XMFLOAT3 GetViewPosition();
 
         void Update(float dt, Ruby::Physics::Triangle* triangles, int count);

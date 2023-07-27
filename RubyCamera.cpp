@@ -48,6 +48,11 @@ namespace Ruby
         return mPosition;
     }
 
+    XMFLOAT3 FPSCamera::GetRotation()
+    {
+        return mRotation;
+    }
+
     XMFLOAT3 FPSCamera::GetVelocity()
     {
         return mVelocity;
@@ -72,6 +77,24 @@ namespace Ruby
         XMStoreFloat3(&result, front);
         return result;
     }
+
+    XMFLOAT3 FPSCamera::GetViewRight()
+    {
+        XMVECTOR right = XMVector3Normalize(mRight);
+        XMFLOAT3 result;
+        XMStoreFloat3(&result, right);
+        return result;
+    }
+
+
+    XMFLOAT3 FPSCamera::GetViewUp()
+    {
+        XMVECTOR right = XMVector3Normalize(mUp);
+        XMFLOAT3 result;
+        XMStoreFloat3(&result, right);
+        return result;
+    }
+
 
 
     void FPSCamera::Update(float dt, Ruby::Physics::Triangle* triangles, int count)

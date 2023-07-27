@@ -163,7 +163,7 @@ bool FPSDemo::Init()
     float centerX = 0.008616f;
     float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
     
@@ -190,8 +190,8 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -699,7 +699,7 @@ void FPSDemo::DrawScene()
 
     // Query the octree
     std::vector<Ruby::OctreeNode<Ruby::SceneStaticObject>*> queryResult;
-    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(8, 8, 8), queryResult);
+    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(16, 16, 16), queryResult);
 
     mShadowMap->BindDsvAndSetNullRenderTarget(mImmediateContext);
 
@@ -779,7 +779,30 @@ void FPSDemo::DrawScene()
             }
             
             XMFLOAT3 camPos = mCamera->GetPosition();
-            world = XMMatrixScaling(0.01f, 0.01f, 0.01f) * XMMatrixTranslation(camPos.x, camPos.y, camPos.z);
+            XMFLOAT3 camRot = mCamera->GetRotation();
+            XMFLOAT3 camDir = mCamera->GetViewDirection();
+            XMFLOAT3 camRight = mCamera->GetViewRight();
+            XMFLOAT3 camUp = mCamera->GetViewUp();
+
+            camPos.x -= camDir.x * 0.4f;
+            camPos.y -= camDir.y * 0.4f;
+            camPos.z -= camDir.z * 0.4f;
+
+            camPos.x += camRight.x * 0.3f;
+            camPos.y += camRight.y * 0.3f;
+            camPos.z += camRight.z * 0.3f;
+
+            camPos.x += camUp.x * 0.2f;
+            camPos.y += camUp.y * 0.2f;
+            camPos.z += camUp.z * 0.2f;
+
+
+            world = XMMatrixScaling(0.009f, 0.009f, 0.009f) *
+                XMMatrixRotationY(XM_PI - 0.035f) *
+                XMMatrixRotationX(camRot.x) *
+                XMMatrixRotationY(camRot.y) *
+                XMMatrixRotationZ(camRot.z) *
+                XMMatrixTranslation(camPos.x, camPos.y, camPos.z);
             worldInvTranspose = InverseTranspose(world);
             worldViewProj = world * viewProj;
             mPbrTextureEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
