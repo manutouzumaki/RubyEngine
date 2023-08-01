@@ -56,8 +56,8 @@ float4 PS(VertexOut pin) : SV_Target
     float3 right = normalize(cross(up, normal));
     up = normalize(cross(normal, right));
     
-    //float sampleDelta = 0.025;
-    float sampleDelta = 0.1;
+    float sampleDelta = 0.025;
+    //float sampleDelta = 0.1;
 
     float nrSamples = 0.0f;
     

@@ -52,6 +52,7 @@ FPSDemo::~FPSDemo()
 
     SAFE_DELETE(mMesh);
     SAFE_DELETE(mGunMesh);
+    SAFE_DELETE(mCollider);
 
     for (int i = 0; i < 4; ++i)
     {
@@ -130,8 +131,10 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
-    mMesh = new Ruby::Mesh(mDevice, "./assets/level3.gltf", "./assets/level3.bin", "./");
+    mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
     mGunMesh = new Ruby::Mesh(mDevice, "./assets/gun/gun.gltf", "./assets/gun/gun.bin", "./");
+    mCollider = new Ruby::Mesh(mDevice, "./assets/sphere.gltf", "./assets/sphere.bin", "./");
+
     
     /*
     
@@ -183,15 +186,15 @@ bool FPSDemo::Init()
     OutputDebugStringA("Mesh split end!!\n");
 
 
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 32.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 48.0f);
 
     DebugProfilerBegin(HDRTexture);
     // Load HDR Texture
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        //float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
-        float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -784,9 +787,26 @@ void FPSDemo::DrawScene()
             XMFLOAT3 camRight = mCamera->GetViewRight();
             XMFLOAT3 camUp = mCamera->GetViewUp();
 
-            camPos.x -= camDir.x * 0.4f;
-            camPos.y -= camDir.y * 0.4f;
-            camPos.z -= camDir.z * 0.4f;
+            world = XMMatrixScaling(0.75f, 0.75f, 0.75f) * XMMatrixTranslation(camPos.x, camPos.y, camPos.z);
+            worldInvTranspose = InverseTranspose(world);
+            worldViewProj = world * viewProj;
+            mPbrColorEffect->mWorld->SetMatrix(reinterpret_cast<float*>(&world));
+            mPbrColorEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
+            mPbrColorEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
+
+            Ruby::Mesh*  mesh = mCollider;
+            for (UINT i = 0; i < mesh->Mat.size(); ++i)
+            {
+                mPbrColorEffect->mMaterial->SetRawValue(&mesh->Mat[i], 0, sizeof(Ruby::Pbr::Material));
+                mPbrColorEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
+                mesh->ModelMesh.Draw(mImmediateContext, i);
+            }
+
+
+
+            camPos.x += camDir.x*1.5f;
+            camPos.y += camDir.y*1.5f;
+            camPos.z += camDir.z*1.5f;
 
             camPos.x += camRight.x * 0.3f;
             camPos.y += camRight.y * 0.3f;
@@ -798,7 +818,7 @@ void FPSDemo::DrawScene()
 
 
             world = XMMatrixScaling(0.009f, 0.009f, 0.009f) *
-                XMMatrixRotationY(XM_PI - 0.035f) *
+                XMMatrixRotationY(XM_PI) *
                 XMMatrixRotationX(camRot.x) *
                 XMMatrixRotationY(camRot.y) *
                 XMMatrixRotationZ(camRot.z) *
@@ -809,7 +829,7 @@ void FPSDemo::DrawScene()
             mPbrTextureEffect->mWorldInvTranspose->SetMatrix(reinterpret_cast<float*>(&worldInvTranspose));
             mPbrTextureEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
 
-            Ruby::Mesh* mesh = mGunMesh;
+            mesh = mGunMesh;
             for (UINT i = 0; i < mesh->Mat.size(); ++i)
             {
                 mPbrTextureEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
@@ -896,6 +916,6 @@ void FPSDemo::DrawScene()
     ID3D11ShaderResourceView* nullSRV[16] = { 0 };
     mImmediateContext->PSSetShaderResources(0, 16, nullSRV);
 
-    mSwapChain->Present(1, 0);
+    mSwapChain->Present(0, 0);
 
 }

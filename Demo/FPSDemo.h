@@ -63,6 +63,7 @@ private:
 
     Ruby::Mesh* mMesh;
     Ruby::Mesh* mGunMesh;
+    Ruby::Mesh* mCollider;
 
     ShadowMap* mShadowMap;
     Ruby::FrameBuffer* mFrameBuffers[2];
