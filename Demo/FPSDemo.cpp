@@ -131,7 +131,8 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
-    mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
+    mMesh = new Ruby::Mesh(mDevice, "./assets/op.gltf", "./assets/op.bin", "./");
+    //mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
     mGunMesh = new Ruby::Mesh(mDevice, "./assets/gun/gun.gltf", "./assets/gun/gun.bin", "./");
     mCollider = new Ruby::Mesh(mDevice, "./assets/sphere.gltf", "./assets/sphere.bin", "./");
 
@@ -141,20 +142,6 @@ bool FPSDemo::Init()
     TODO IMPORTANT(MANUTO):
         - FIX memory leak in the octree
 
-    */
-
-    /*
-    for (int i = 0; i < mMesh->Indices.size(); i += 3)
-    {
-        XMFLOAT3 a = mMesh->Vertices[mMesh->Indices[i + 0]].Position;
-        XMFLOAT3 b = mMesh->Vertices[mMesh->Indices[i + 1]].Position;
-        XMFLOAT3 c = mMesh->Vertices[mMesh->Indices[i + 2]].Position;
-        Ruby::Physics::Triangle triangle;
-        triangle.a = Ruby::Physics::Vector3(a.x, a.y, a.z);
-        triangle.b = Ruby::Physics::Vector3(b.x, b.y, b.z);
-        triangle.c = Ruby::Physics::Vector3(c.x, c.y, c.z);
-        mTriangles.push_back(triangle);
-    }
     */
 
     XMFLOAT3 min, max;
@@ -186,7 +173,7 @@ bool FPSDemo::Init()
     OutputDebugStringA("Mesh split end!!\n");
 
 
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 48.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 36.0f);
 
     DebugProfilerBegin(HDRTexture);
     // Load HDR Texture
@@ -600,31 +587,29 @@ void FPSDemo::OnResize()
 
 void FPSDemo::UpdateScene()
 {
-    float dt = mTimer.DeltaTime();
-
     if (mInput.KeyIsDown('W'))
     {
-        mCamera->MoveForward(dt);
+        mCamera->MoveForward();
     }
     if (mInput.KeyIsDown('S'))
     {
-        mCamera->MoveBackward(dt);
+        mCamera->MoveBackward();
     }
     if (mInput.KeyIsDown('A'))
     {
-        mCamera->MoveLeft(dt);
+        mCamera->MoveLeft();
     }
     if (mInput.KeyIsDown('D'))
     {
-        mCamera->MoveRight(dt);
+        mCamera->MoveRight();
     }
     if (mInput.KeyIsDown('R'))
     {
-        mCamera->MoveUp(dt);
+        mCamera->MoveUp();
     }
     if (mInput.KeyIsDown('F'))
     {
-        mCamera->MoveDown(dt);
+        mCamera->MoveDown();
     }
 
     if (mInput.MouseButtonJustDown(1))
@@ -641,7 +626,7 @@ void FPSDemo::UpdateScene()
         int deltaX = mInput.MousePosX() - mInput.MouseLastPosX();
         int deltaY = mInput.MousePosY() - mInput.MouseLastPosY();
 
-        mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f);
+        mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f, mTimer.DeltaTime());
 
         SetCursorPos(mWindowX + mClientWidth / 2, mWindowY + mClientHeight / 2);
         mInput.mCurrent.mouseX = mClientWidth / 2;
@@ -650,6 +635,16 @@ void FPSDemo::UpdateScene()
         mInput.mLast.mouseY = mClientHeight / 2;
 
     }
+
+    mCamera->Update(mTimer.DeltaTime());
+
+}
+
+void FPSDemo::FixUpdateScene(float dt)
+{
+    //char Buffer[256];
+    //sprintf_s(Buffer, "fix update FPS: %f\n", 1.0f / dt);
+    //OutputDebugStringA(Buffer);
 
     std::vector<Ruby::OctreeNode<Ruby::SceneStaticObject>*> queryResult;
     mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(4, 4, 4), queryResult);
@@ -661,38 +656,19 @@ void FPSDemo::UpdateScene()
         triangles.insert(triangles.end(), object.mTriangles.begin(), object.mTriangles.end());
     }
 
-    mCamera->Update(dt, triangles.data(), triangles.size());
+    mCamera->FixUpdate(dt, triangles.data(), triangles.size());
+}
 
-
-
-    angle += 0.5f * dt;
-
-    XMMATRIX world = XMMatrixRotationY(angle) * XMMatrixRotationX(angle * 2.0f);
-    DirectX::XMStoreFloat4x4(&mWorld, world);
-
-    XMFLOAT3 targetDir = XMFLOAT3(0, 0, 0);
-
-    // Build the view matrix.
-    XMFLOAT3 eyePos = mCamera->GetViewPosition();
-
-    XMVECTOR pos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
-    XMVECTOR target = XMVectorSet(targetDir.x, targetDir.y, targetDir.z, 0.0f);
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+void FPSDemo::PostUpdateScene(float t)
+{
+    // TODO: interpolate the position between frames
+    mCamera->PostUpdate(t);
 
     XMMATRIX V = mCamera->GetView();
     DirectX::XMStoreFloat4x4(&mView, V);
-    mPbrColorEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
-    mPbrTextureEffect->mEyePosW->SetRawValue(&eyePos, 0, sizeof(XMFLOAT3));
-
-
-    static float timer = 0.0f;
-
-    timer += dt;
-    if (timer >= 4.0f)
-    {
-        timer = 0.0f;
-    }
-    mSkyEffect->mTimer->SetRawValue(&timer, 0, sizeof(float));
+    XMFLOAT3 camPos = mCamera->GetPosition();
+    mPbrColorEffect->mEyePosW->SetRawValue(&camPos, 0, sizeof(XMFLOAT3));
+    mPbrTextureEffect->mEyePosW->SetRawValue(&camPos, 0, sizeof(XMFLOAT3));
 }
 
 void FPSDemo::DrawScene()
@@ -835,18 +811,21 @@ void FPSDemo::DrawScene()
                 mPbrTextureEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
                 mesh->ModelMesh.Draw(mImmediateContext, i);
             }
+            
         }
-
+        
+        
         mSkyEffect->GetTechnique()->GetDesc(&techDesc);
         for (UINT p = 0; p < techDesc.Passes; ++p)
         {
-            XMFLOAT3 eyePos = mCamera->GetViewPosition();
+            XMFLOAT3 eyePos = mCamera->GetPosition();
             XMMATRIX world = XMMatrixTranslation(eyePos.x, eyePos.y, eyePos.z);
             XMMATRIX worldViewProj = world * viewProj;
             mSkyEffect->mWorldViewProj->SetMatrix(reinterpret_cast<float*>(&worldViewProj));
             mSkyEffect->GetTechnique()->GetPassByIndex(p)->Apply(0, mImmediateContext);
             mSky.Draw(mImmediateContext, 0);
         }
+        
     }
 
     mImmediateContext->RSSetState(0);

@@ -237,31 +237,29 @@ void BoxDemo::UpdateScene()
 {
     // Camera Update code ...
     {
-        float dt = mTimer.DeltaTime();
-
         if (mInput.KeyIsDown('W'))
         {
-            mCamera->MoveForward(dt);
+            mCamera->MoveForward();
         }
         if (mInput.KeyIsDown('S'))
         {
-            mCamera->MoveBackward(dt);
+            mCamera->MoveBackward();
         }
         if (mInput.KeyIsDown('A'))
         {
-            mCamera->MoveLeft(dt);
+            mCamera->MoveLeft();
         }
         if (mInput.KeyIsDown('D'))
         {
-            mCamera->MoveRight(dt);
+            mCamera->MoveRight();
         }
         if (mInput.KeyIsDown('R'))
         {
-            mCamera->MoveUp(dt);
+            mCamera->MoveUp();
         }
         if (mInput.KeyIsDown('F'))
         {
-            mCamera->MoveDown(dt);
+            mCamera->MoveDown();
         }
 
         if (mInput.MouseButtonJustDown(1))
@@ -278,7 +276,7 @@ void BoxDemo::UpdateScene()
             int deltaX = mInput.MousePosX() - mInput.MouseLastPosX();
             int deltaY = mInput.MousePosY() - mInput.MouseLastPosY();
 
-            mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f);
+            mCamera->MouseMove((float)deltaX * 0.001f, (float)deltaY * 0.001f, mTimer.DeltaTime());
 
             SetCursorPos(mWindowX + mClientWidth / 2, mWindowY + mClientHeight / 2);
             mInput.mCurrent.mouseX = mClientWidth / 2;
@@ -288,7 +286,7 @@ void BoxDemo::UpdateScene()
 
         }
 
-        mCamera->Update(dt, mTriangles.data(), mTriangles.size());
+        mCamera->Update(mTimer.DeltaTime());
         XMStoreFloat4x4(&mView, mCamera->GetView());
 
     }

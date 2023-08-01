@@ -169,8 +169,30 @@ namespace Ruby
 
         mRunning = true;
 
+        float accumulator = 0.0f;
+        float dt = 1.0f / 120.0f;
+        float targetFrameTime = 1.0f/120.0f;
+
+        LARGE_INTEGER freq;
+        LARGE_INTEGER lastTime;
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&lastTime);
+
         while (mRunning)
         {
+            LARGE_INTEGER currentTime;
+            QueryPerformanceCounter(&currentTime);
+
+            float frameTime = (float)(currentTime.QuadPart - lastTime.QuadPart) / (float)freq.QuadPart;
+            while (frameTime < targetFrameTime)
+            {
+                FlushEvents();
+                QueryPerformanceCounter(&currentTime);
+                frameTime = (float)(currentTime.QuadPart - lastTime.QuadPart) / (float)freq.QuadPart;
+            }
+
+            lastTime = currentTime;
+
             FlushEvents();
 
             mTimer.Tick();
@@ -181,7 +203,22 @@ namespace Ruby
                 wsprintf(buffer, "%s FPS: %d\n", mWindowCaption, (int)(1.0f / mTimer.DeltaTime()));
                 SetWindowText(mWindow, buffer);
 
+                // Update
                 UpdateScene();
+
+                // Fix Update
+                accumulator += mTimer.DeltaTime();
+                int counter = 0;
+                while (accumulator >= dt) {
+                    counter++;
+                    
+                    FixUpdateScene(dt);
+                    accumulator -= dt;
+                }
+
+                float t = accumulator / dt;
+                PostUpdateScene(t); // NOTE: this is use for position interpolation before rendering
+
                 DrawScene();
             }
             else

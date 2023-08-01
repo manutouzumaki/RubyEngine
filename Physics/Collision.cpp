@@ -7,7 +7,6 @@ namespace Ruby { namespace Physics {
         return fminf(fmaxf(a, min), max);
     }
 
-
     float ClosestPtSegmentSegment(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2, float& s, float& t, Vector3& c1, Vector3& c2) {
         Vector3 d1 = q1 - p1; // direction vector of segment s1
         Vector3 d2 = q2 - p2; // direction vector of segment s2
@@ -65,7 +64,6 @@ namespace Ruby { namespace Physics {
         return (c1 - c2).ScalarProduct(c1 - c2);
     }
 
-
     int Sphere::MovingSpherePlane(Vector3 v, Plane p, float& t, Vector3& q)
     {
         float dist = p.n.ScalarProduct(c) - p.d;
@@ -121,13 +119,13 @@ namespace Ruby { namespace Physics {
             Sphere sphere;
             sphere.c = c2;
             sphere.r = capsule.r;
-            sphere.IntersectSegment(*this, tout, q);
+            sphere.IntersectSegment(*this, t, q);
+            tout = t;
             return 1;
         }
 
         return 0;
     }
-
 
 	Line::Line(Vector3 start, Vector3 end)
 		: start(start), end(end)
@@ -235,7 +233,6 @@ namespace Ruby { namespace Physics {
 		return c3;
 	}
 
-
     Point Point::ClosestPointSegement(const Segment&segment) {
         Vector3 q;
         Vector3 ab = segment.b - segment.a;
@@ -259,7 +256,6 @@ namespace Ruby { namespace Physics {
             }
         }
     }
-
 
     real Ray::RaycastSphere(const Sphere& s)
     {

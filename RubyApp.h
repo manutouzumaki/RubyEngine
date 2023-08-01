@@ -33,6 +33,8 @@ namespace Ruby
         virtual bool Init();
         virtual void OnResize();
         virtual void UpdateScene() = 0;
+        virtual void FixUpdateScene(float dt) {};
+        virtual void PostUpdateScene(float t) {};
         virtual void DrawScene() = 0;
        
         virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

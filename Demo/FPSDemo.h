@@ -25,6 +25,8 @@ public:
     bool Init();
     void OnResize();
     void UpdateScene();
+    void FixUpdateScene(float dt);
+    void PostUpdateScene(float t);
     void DrawScene();
 
     void SplitGeometryFast(Ruby::OctreeNode<Ruby::SceneStaticObject>* node);

@@ -20,11 +20,13 @@ namespace Ruby
         XMVECTOR mWorldFront;
         XMVECTOR mWorldUp;
 
-        XMFLOAT3 mViewPos;
-
+        XMFLOAT3 mPotentialPosition;
+        XMFLOAT3 mLastPosition;
         XMFLOAT3 mPosition;
         XMFLOAT3 mVelocity;
         XMFLOAT3 mAcceleration;
+
+        XMFLOAT3 mRenderPosition;
 
         XMFLOAT3 mRotation;
 
@@ -42,16 +44,17 @@ namespace Ruby
         XMFLOAT3 GetViewDirection();
         XMFLOAT3 GetViewRight();
         XMFLOAT3 GetViewUp();
-        XMFLOAT3 GetViewPosition();
 
-        void Update(float dt, Ruby::Physics::Triangle* triangles, int count);
-        void MouseMove(float mouseX, float mouseY);
-        void MoveForward(float dt);
-        void MoveBackward(float dt);
-        void MoveLeft(float dt);
-        void MoveRight(float dt);
-        void MoveUp(float dt);
-        void MoveDown(float dt);
+        void Update(float dt);
+        void FixUpdate(float dt, Ruby::Physics::Triangle* triangles, int count);
+        void PostUpdate(float t);
+        void MouseMove(float mouseX, float mouseY, float dt);
+        void MoveForward();
+        void MoveBackward();
+        void MoveLeft();
+        void MoveRight();
+        void MoveUp();
+        void MoveDown();
 
     };
 
