@@ -153,7 +153,7 @@ bool FPSDemo::Init()
     float centerX = 0.008616f;
     float centerZ = -0.024896f;
 
-    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 2);
+    mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
 
     Ruby::Octree<Ruby::SceneStaticObject>* octree = &mScene->mStaticObjectTree;
     
@@ -180,7 +180,7 @@ bool FPSDemo::Init()
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/studio_small_06_4k.hdr", &width, &height, &nrComponents, 0);
         //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
@@ -678,7 +678,7 @@ void FPSDemo::DrawScene()
 
     // Query the octree
     std::vector<Ruby::OctreeNode<Ruby::SceneStaticObject>*> queryResult;
-    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(16, 16, 16), queryResult);
+    mScene->mStaticObjectTree.mRoot->Query(mCamera->GetPosition(), XMFLOAT3(32, 16, 32), queryResult);
 
     mShadowMap->BindDsvAndSetNullRenderTarget(mImmediateContext);
 
