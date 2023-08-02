@@ -14,10 +14,12 @@ namespace Ruby
         mLastPosition(position),
         mRenderPosition(position),
         mVelocity(0, 0, 0),
+        mMovement(0, 0, 0),
         mAcceleration(0, 0, 0),
         mRotation(rotation),
         mSpeed(speed),
-        mDumping(0.001f)
+        mDumping(0.001f),
+        mGrounded(false)
     {
 
         XMVECTOR pos = XMVectorSet(mPosition.x, mPosition.y, mPosition.z, 1.0f);
@@ -215,12 +217,29 @@ namespace Ruby
             ++iterations;
             CollisionDetection(pos, vel, dt, triangles, count, t, collisionCount, n);
         }
-#endif
+#endif        
+    }
 
-        char buffer[256];
-        wsprintf(buffer, "iterations: %d\n", iterations);
-        OutputDebugStringA(buffer);
-        
+    void GroundDetection(Physics::Ray& ray,
+        bool& grounded, XMFLOAT3& vel, XMFLOAT3& acc,
+        Physics::Triangle* triangles, int count)
+    {
+        grounded = false;
+        for (int i = 0; i < count; ++i)
+        {
+            Physics::Triangle triangle = triangles[i];
+            Physics::real t = ray.RaycastTriangle(triangle);
+            if (t >= 0.0f && t <= 1.0f)
+            {
+                grounded = true;
+                if (vel.y < 0)
+                {
+                    vel.y = 0;
+                    acc.y = 0;
+                }
+                break;
+            }
+        }
     }
 
     void FPSCamera::Update(float dt)
@@ -230,6 +249,19 @@ namespace Ruby
         mFront = XMVector3Normalize(XMVector3Transform(mFront, XMMatrixRotationZ(mRotation.z)));
         mRight = XMVector3Normalize(XMVector3Cross(mWorldUp, mFront));
         mUp = XMVector3Normalize(XMVector3Cross(mRight, mFront));
+        mDirection = XMVector3Normalize(XMVector3Cross(mRight, mWorldUp));
+
+        XMVECTOR mov = XMVectorSet(mMovement.x, mMovement.y, mMovement.z, 0.0f);
+        mov = XMVector3Normalize(mov) * mSpeed;
+        XMStoreFloat3(&mMovement, mov);
+        if (!mGrounded)
+        {
+            mMovement.x *= 0.1f;
+            mMovement.z *= 0.1f;
+        }
+        ApplyForce(mMovement);
+        mMovement = XMFLOAT3(0, 0, 0);
+    
     }
 
     void FPSCamera::FixUpdate(float dt, Ruby::Physics::Triangle* triangles, int count)
@@ -239,11 +271,34 @@ namespace Ruby
         XMVECTOR pos = XMVectorSet(mPosition.x, mPosition.y, mPosition.z, 1.0f);
         XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
         XMVECTOR vel = XMVectorSet(mVelocity.x, mVelocity.y, mVelocity.z, 0.0f);
-        vel = vel + (XMVector3Normalize(acc) * mSpeed) * dt;
-        vel = vel * powf(mDumping, dt);
+
+        vel = vel + acc * dt;
+        
+        if (mGrounded)
+        {
+            float dammping = powf(0.001f, dt);
+            vel.m128_f32[0] = vel.m128_f32[0] * dammping;
+            vel.m128_f32[2] = vel.m128_f32[2] * dammping;
+        }
+        else
+        {
+            float dammping = powf(0.5f, dt);
+            vel.m128_f32[0] = vel.m128_f32[0] * dammping;
+            vel.m128_f32[2] = vel.m128_f32[2] * dammping;
+        }
 
         XMVECTOR potPos;
         potPos = pos + (vel * dt);
+
+        Physics::Ray ray;
+        ray.o = Physics::Vector3(mPosition.x, mPosition.y, mPosition.z);
+        ray.d = Physics::Vector3(0, -1, 0) * (0.75f + 0.15);
+
+        XMStoreFloat3(&mVelocity, vel);
+
+        GroundDetection(ray, mGrounded, mVelocity, mAcceleration, triangles, count);
+        
+        vel = XMVectorSet(mVelocity.x, mVelocity.y, mVelocity.z, 0.0f);
 
         ProccessCollisionDetectionAndResolution(pos, potPos, vel, dt, triangles, count);
         
@@ -252,6 +307,12 @@ namespace Ruby
         XMStoreFloat3(&mPosition, pos);
 
 
+        char buffer[256];
+        sprintf_s(buffer, "mVelocity: (%f, %f, %f)\n", mVelocity.x, mVelocity.y, mVelocity.z);
+        OutputDebugStringA(buffer);
+        sprintf_s(buffer, "mAcceleration: (%f, %f, %f)\n", mAcceleration.x, mAcceleration.y, mAcceleration.z);
+        OutputDebugStringA(buffer);
+
     }
 
     void FPSCamera::PostUpdate(float t)
@@ -259,10 +320,7 @@ namespace Ruby
         XMVECTOR pos = XMVectorSet(mPosition.x, mPosition.y, mPosition.z, 1.0f);
         XMVECTOR lastPos = XMVectorSet(mLastPosition.x, mLastPosition.y, mLastPosition.z, 1.0f);
 
-
-
         XMVECTOR renderPos = pos * t + lastPos * (1.0f - t);
-
         mView = XMMatrixLookAtLH(renderPos, renderPos + mFront, mWorldUp);
 
         XMStoreFloat3(&mPosition, pos);
@@ -283,45 +341,50 @@ namespace Ruby
 
     void FPSCamera::MoveForward()
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc + mFront;
-        XMStoreFloat3(&mAcceleration, acc);
-
+        XMVECTOR mov = XMVectorSet(mMovement.x, mMovement.y, mMovement.z, 0.0f);
+        mov = mov + mDirection;
+        XMStoreFloat3(&mMovement, mov);
     }
 
     void FPSCamera::MoveBackward()
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc - mFront;
-        XMStoreFloat3(&mAcceleration, acc);
+        XMVECTOR mov = XMVectorSet(mMovement.x, mMovement.y, mMovement.z, 0.0f);
+        mov = mov - mDirection;
+        XMStoreFloat3(&mMovement, mov);
     }
 
     void FPSCamera::MoveLeft()
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc - mRight;
-        XMStoreFloat3(&mAcceleration, acc);
+        XMVECTOR mov = XMVectorSet(mMovement.x, mMovement.y, mMovement.z, 0.0f);
+        mov = mov - mRight;
+        XMStoreFloat3(&mMovement, mov);
     }
 
     void FPSCamera::MoveRight()
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc + mRight;
-        XMStoreFloat3(&mAcceleration, acc);
+        XMVECTOR mov = XMVectorSet(mMovement.x, mMovement.y, mMovement.z, 0.0f);
+        mov = mov + mRight;
+        XMStoreFloat3(&mMovement, mov);
     }
 
-    void FPSCamera::MoveUp()
+    void FPSCamera::ApplyForce(XMFLOAT3 force)
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc + mWorldUp;
-        XMStoreFloat3(&mAcceleration, acc);
+        mAcceleration.x += force.x;
+        mAcceleration.y += force.y;
+        mAcceleration.z += force.z;
     }
 
-    void FPSCamera::MoveDown()
+    void FPSCamera::ApplyImpulse(XMFLOAT3  impulse)
     {
-        XMVECTOR acc = XMVectorSet(mAcceleration.x, mAcceleration.y, mAcceleration.z, 0.0f);
-        acc = acc - mWorldUp;
-        XMStoreFloat3(&mAcceleration, acc);
+        mVelocity.x += impulse.x;
+        mVelocity.y += impulse.y;
+        mVelocity.z += impulse.z;
     }
+    
+    bool FPSCamera::Grounded()
+    {
+        return mGrounded;
+    }
+
 
 }

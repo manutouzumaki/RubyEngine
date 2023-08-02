@@ -173,15 +173,16 @@ bool FPSDemo::Init()
     OutputDebugStringA("Mesh split end!!\n");
 
 
-    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 36.0f);
+    mCamera = new Ruby::FPSCamera(XMFLOAT3(0, 1, 0), XMFLOAT3(0, 0, 0), 32.0f);
 
     DebugProfilerBegin(HDRTexture);
     // Load HDR Texture
     {
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
-        float* data = stbi_loadf("./assets/studio_small_06_4k.hdr", &width, &height, &nrComponents, 0);
+        //float* data = stbi_loadf("./assets/studio_small_06_4k.hdr", &width, &height, &nrComponents, 0);
         //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
@@ -294,7 +295,7 @@ bool FPSDemo::Init()
     HRESULT result = mDevice->CreateInputLayout(vertexDesc, 4, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mInputLayout);
 
     // set proj matrices
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 0.001f, 100.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH((60.0f / 180.0f) * XM_PI, AspectRatio(), 0.001f, 100.0f);
     DirectX::XMStoreFloat4x4(&mProj, P);
 
     lightPos = XMVectorSet(0.0f, lightHeight, lightDist, 1.0f);
@@ -569,7 +570,7 @@ void FPSDemo::OnResize()
 {
     Ruby::App::OnResize();
     // set proj matrices
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 0.001f, 100.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH((60.0f / 180.0f) * XM_PI, AspectRatio(), 0.001f, 100.0f);
     DirectX::XMStoreFloat4x4(&mProj, P);
 
     if (mFrameBuffers[0])
@@ -603,14 +604,12 @@ void FPSDemo::UpdateScene()
     {
         mCamera->MoveRight();
     }
-    if (mInput.KeyIsDown('R'))
+    if (mInput.KeyJustDown(VK_SPACE) && mCamera->Grounded())
     {
-        mCamera->MoveUp();
+        XMFLOAT3 jumpForce = XMFLOAT3(0, 6.0, 0);
+        mCamera->ApplyImpulse(jumpForce);
     }
-    if (mInput.KeyIsDown('F'))
-    {
-        mCamera->MoveDown();
-    }
+
 
     if (mInput.MouseButtonJustDown(1))
     {
@@ -636,6 +635,11 @@ void FPSDemo::UpdateScene()
 
     }
 
+    if (!mCamera->Grounded())
+    {
+        XMFLOAT3 gravity = XMFLOAT3(0, -9.8 * 1.5, 0);
+        mCamera->ApplyForce(gravity);
+    }
     mCamera->Update(mTimer.DeltaTime());
 
 }

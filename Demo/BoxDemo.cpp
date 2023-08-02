@@ -253,15 +253,6 @@ void BoxDemo::UpdateScene()
         {
             mCamera->MoveRight();
         }
-        if (mInput.KeyIsDown('R'))
-        {
-            mCamera->MoveUp();
-        }
-        if (mInput.KeyIsDown('F'))
-        {
-            mCamera->MoveDown();
-        }
-
         if (mInput.MouseButtonJustDown(1))
         {
             ShowCursor(false);

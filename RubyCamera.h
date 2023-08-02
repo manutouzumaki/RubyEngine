@@ -12,26 +12,31 @@ namespace Ruby
     class FPSCamera
     {
         XMMATRIX mView;
-
         XMVECTOR mFront;
         XMVECTOR mRight;
         XMVECTOR mUp;
+        XMVECTOR mDirection;
 
         XMVECTOR mWorldFront;
         XMVECTOR mWorldUp;
+        
+        // camra rotation
+        XMFLOAT3 mRotation;
 
+        // physics of the player
         XMFLOAT3 mPotentialPosition;
         XMFLOAT3 mLastPosition;
         XMFLOAT3 mPosition;
-        XMFLOAT3 mVelocity;
+        XMFLOAT3 mVelocity;        
         XMFLOAT3 mAcceleration;
-
+        XMFLOAT3 mMovement;
+        
+        // render position of the player
         XMFLOAT3 mRenderPosition;
-
-        XMFLOAT3 mRotation;
 
         float mSpeed;
         float mDumping;
+        bool mGrounded;
  
     public:
         FPSCamera(XMFLOAT3 position, XMFLOAT3 rotation, float speed);
@@ -44,6 +49,7 @@ namespace Ruby
         XMFLOAT3 GetViewDirection();
         XMFLOAT3 GetViewRight();
         XMFLOAT3 GetViewUp();
+        bool Grounded();
 
         void Update(float dt);
         void FixUpdate(float dt, Ruby::Physics::Triangle* triangles, int count);
@@ -53,8 +59,9 @@ namespace Ruby
         void MoveBackward();
         void MoveLeft();
         void MoveRight();
-        void MoveUp();
-        void MoveDown();
+
+        void ApplyForce(XMFLOAT3 force);
+        void ApplyImpulse(XMFLOAT3  impulse);
 
     };
 
