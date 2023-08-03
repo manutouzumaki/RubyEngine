@@ -182,7 +182,7 @@ bool FPSDemo::Init()
         int width, height, nrComponents;
         //float* data = stbi_loadf("./assets/studio_small_06_4k.hdr", &width, &height, &nrComponents, 0);
         //float* data = stbi_loadf("./assets/sky.hdr", &width, &height, &nrComponents, 0);
-        float* data = stbi_loadf("./assets/newport_loft.hdr", &width, &height, &nrComponents, 0);
+        float* data = stbi_loadf("./assets/sky2.hdr", &width, &height, &nrComponents, 0);
         if (data)
         {
             // Create HDR Texture2D
