@@ -131,6 +131,7 @@ bool FPSDemo::Init()
     fillRasterizerNoneDesc.DepthClipEnable = true;
     mDevice->CreateRasterizerState(&fillRasterizerNoneDesc, &mRasterizerStateFrontCull);
 
+    //mMesh = new Ruby::Mesh(mDevice, "./assets/maze.gltf", "./assets/maze.bin", "./");
     mMesh = new Ruby::Mesh(mDevice, "./assets/op.gltf", "./assets/op.bin", "./");
     //mMesh = new Ruby::Mesh(mDevice, "./assets/level2.gltf", "./assets/level2.bin", "./");
     mGunMesh = new Ruby::Mesh(mDevice, "./assets/gun/gun.gltf", "./assets/gun/gun.bin", "./");
@@ -147,11 +148,11 @@ bool FPSDemo::Init()
     XMFLOAT3 min, max;
     mMesh->GetBoundingBox(min, max);
 
-    float meshWidth = max.x - min.x;
-    float meshDepth = max.z - min.z;
+    float meshWidth = max.x - min.x + 2;
+    float meshDepth = max.z - min.z + 2;
 
-    float centerX = 0.008616f;
-    float centerZ = -0.024896f;
+    float centerX = 0;
+    float centerZ = 0;
 
     mScene = new Ruby::Scene(XMFLOAT3(centerX, 0.0f, centerZ), meshDepth * 0.5f, 3);
 
